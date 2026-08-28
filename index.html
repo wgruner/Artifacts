@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Artifacts</title>
+<style>
+  :root {
+    --bg: #faf8f3;
+    --surface: #fff;
+    --line: #e4ded0;
+    --text: #2c2a25;
+    --muted: #7a7568;
+    --accent: #9b59b6;
+    --accent-dark: #6f3d82;
+    --radius: 10px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 16px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  #wrap {
+    max-width: 640px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 1.6rem;
+    margin: 0 0 24px;
+    color: var(--accent-dark);
+  }
+  ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  li {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+  li a {
+    display: block;
+    padding: 14px 16px;
+    color: var(--text);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  li a:hover {
+    color: var(--accent-dark);
+  }
+  li .date {
+    display: block;
+    margin-top: 3px;
+    font-size: 0.82rem;
+    font-weight: 400;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Artifacts</h1>
+  <ul>
+    <li>
+      <a href="agua_piedra_jicarita_peak_map_v49.html">
+        Agua Piedra to Jicarita Peak Loop
+        <span class="date">Interactive trip map &ndash; GPX track, itinerary, elevation/temp profile</span>
+      </a>
+    </li>
+    <!-- Add new entries above this line -->
+  </ul>
+</div>
+</body>
+</html>
