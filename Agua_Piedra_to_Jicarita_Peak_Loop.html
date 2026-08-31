@@ -209,6 +209,8 @@
   .poi-water { background: #5b93c4; width: 16px; height: 16px; }
   .poi-parking { background: #938c7a; width: 14px; height: 14px; }
   .poi-note { background: #c7b99a; width: 10px; height: 10px; }
+  .poi-water-osm { background: transparent; border: 2px solid #17a2b8; width: 12px; height: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.35); }
+  .poi-water-crossing { background: #0d6efd; width: 9px; height: 9px; border-radius: 2px; transform: rotate(45deg); box-shadow: 0 1px 3px rgba(0,0,0,0.35); }
 
   #poi-panel {
     position: absolute;
@@ -474,9 +476,10 @@
           </button>
           <div class="panel-body" id="poi-panel-body">
             <label><input type="checkbox" id="toggle-camp" checked><span class="swatch" style="background:#6ba362"></span>Campsites</label>
+            <label><input type="checkbox" id="toggle-note"><span class="swatch" style="background:#c7b99a"></span>Notes from SF2T</label>
             <label><input type="checkbox" id="toggle-water" checked><span class="swatch" style="background:#5b93c4"></span>Water</label>
+            <label><input type="checkbox" id="toggle-water-osm" checked><span class="swatch" style="background:transparent;border:2px solid #17a2b8"></span>Water from OSM<span id="water-osm-status" style="color:var(--muted); font-size:0.8em; margin-left:4px;"></span></label>
             <label><input type="checkbox" id="toggle-parking" checked><span class="swatch" style="background:#938c7a"></span>Parking</label>
-            <label><input type="checkbox" id="toggle-note"><span class="swatch" style="background:#c7b99a"></span>Trail notes</label>
           </div>
         </div>
       </div>
@@ -588,8 +591,34 @@ const peak = track[peakIdx];
 // ---------- Map ----------
 const latlngs = track.map(p => [p[0], p[1]]);
 
-const map = L.map('map', { zoomControl: true }).fitBounds(latlngs, { padding: [24,24] });
+// zoomSnap: 0.25 lets fitBounds settle on a fractional zoom instead of rounding
+// down to the next whole level, so the loop isn't left with a wasted near-full
+// zoom-level's worth of margin around it.
+const map = L.map('map', { zoomControl: true, zoomSnap: 0.25 });
 const initialBounds = L.latLngBounds(latlngs);
+
+// Until the user actually pans/zooms the map themselves, keep it auto-fit to
+// the full loop. The map's container size can keep settling after the first
+// fitBounds() call (web fonts swapping in, mobile chrome insets animating,
+// the flex/aspect-ratio layout taking a frame or two) — if we only fit once
+// and invalidateSize() after that, a fit measured against a not-yet-final
+// container can lock in a zoomed-out view that never corrects itself.
+let userAdjustedMap = false;
+let programmaticMove = false;
+const FIT_MARGIN_FRACTION = 0.05; // ~5% of the map's own size, so it scales with the square mobile layout and the wider desktop one alike
+function fitToRoute() {
+  programmaticMove = true;
+  const size = map.getSize();
+  const padding = [size.x * FIT_MARGIN_FRACTION, size.y * FIT_MARGIN_FRACTION];
+  // animate:false — this runs on every settle-correction (resize, late font/tile
+  // load, ResizeObserver), so it needs to take effect immediately and
+  // synchronously rather than depend on a CSS zoom transition completing.
+  map.fitBounds(initialBounds, { padding, animate: false });
+  programmaticMove = false;
+}
+fitToRoute();
+map.on('zoomstart', () => { if (!programmaticMove) userAdjustedMap = true; });
+map.on('dragstart', () => { userAdjustedMap = true; });
 
 const ResetZoomControl = L.Control.extend({
   options: { position: 'topleft' },
@@ -601,7 +630,8 @@ const ResetZoomControl = L.Control.extend({
     btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 8 3 3 8 3"/><polyline points="16 3 21 3 21 8"/><polyline points="21 16 21 21 16 21"/><polyline points="8 21 3 21 3 16"/></svg>';
     L.DomEvent.on(btn, 'click', function(e) {
       L.DomEvent.stop(e);
-      map.fitBounds(initialBounds, { padding: [24,24] });
+      userAdjustedMap = false; // an explicit reset re-enables auto-fit-on-settle, same as the initial load
+      fitToRoute();
     });
     return container;
   }
@@ -656,9 +686,9 @@ map.on('popupopen', function(e) {
 });
 
 
-const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19,
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+const osmLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+  maxZoom: 17,
+  attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
 }).addTo(map);
 
 const trackLine = L.polyline(latlngs, {
@@ -951,7 +981,7 @@ const poiData = [{"lat": 36.121339, "lon": -105.529513, "name": "Water - Agua Pi
 // names (case-insensitive substring match) that our group is definitely camping at
 const plannedCamps = ['los esteros', 'serpent lake'];
 
-const poiLayers = { camp: L.layerGroup(), water: L.layerGroup(), parking: L.layerGroup(), note: L.layerGroup() };
+const poiLayers = { camp: L.layerGroup(), water: L.layerGroup(), parking: L.layerGroup(), note: L.layerGroup(), waterOsm: L.layerGroup() };
 
 function poiIcon(cat, highlight) {
   const cls = highlight ? 'poi-camp poi-camp-highlight' : 'poi-' + cat;
@@ -990,6 +1020,182 @@ document.getElementById('toggle-parking').addEventListener('change', e => {
 document.getElementById('toggle-note').addEventListener('change', e => {
   e.target.checked ? poiLayers.note.addTo(map) : map.removeLayer(poiLayers.note);
 });
+document.getElementById('toggle-water-osm').addEventListener('change', e => {
+  e.target.checked ? poiLayers.waterOsm.addTo(map) : map.removeLayer(poiLayers.waterOsm);
+});
+
+// ---------- Live OSM water features via Overpass: ponds/springs/taps within ~1 mi of the route, plus stream crossings ----------
+const waterOsmStatusEl = document.getElementById('water-osm-status');
+const WATER_RADIUS_MI = 1;
+const WATER_RADIUS_M = WATER_RADIUS_MI * 1609.34;
+
+function overpassWaterLabel(tags) {
+  if (tags.name) return tags.name;
+  if (tags.natural === 'spring') return 'Spring';
+  if (tags.natural === 'water') return 'Water (pond/lake)';
+  if (tags.amenity === 'drinking_water') return 'Drinking water';
+  if (tags.man_made === 'water_well') return 'Water well';
+  if (tags.man_made === 'water_tap') return 'Water tap';
+  return 'Water feature';
+}
+
+function haversineMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000, toRad = x => x * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.asin(Math.sqrt(a));
+}
+
+// Nearest track point to a given coordinate: gives both the distance (for the
+// 1-mile filter) and an index into cumDist (for a "mile X.X in" label).
+function nearestTrackInfo(lat, lon) {
+  let bestIdx = 0, bestD = Infinity;
+  for (let i = 0; i < track.length; i++) {
+    const d = haversineMeters(lat, lon, track[i][0], track[i][1]);
+    if (d < bestD) { bestD = d; bestIdx = i; }
+  }
+  return { dist: bestD, idx: bestIdx };
+}
+
+// Segment-segment intersection (Wikipedia line-intersection formula), points as [lat, lon].
+function segIntersect(p1, p2, p3, p4) {
+  const x1 = p1[1], y1 = p1[0], x2 = p2[1], y2 = p2[0];
+  const x3 = p3[1], y3 = p3[0], x4 = p4[1], y4 = p4[0];
+  const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+  if (Math.abs(denom) < 1e-15) return null;
+  const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+  const u = ((x1 - x3) * (y1 - y2) - (y1 - y3) * (x1 - x2)) / denom;
+  if (t < 0 || t > 1 || u < 0 || u > 1) return null;
+  return [y1 + t * (y2 - y1), x1 + t * (x2 - x1)];
+}
+
+function findStreamCrossings(streamGeom) {
+  const hits = [];
+  for (let i = 0; i < track.length - 1; i++) {
+    for (let j = 0; j < streamGeom.length - 1; j++) {
+      const pt = segIntersect(track[i], track[i + 1], [streamGeom[j].lat, streamGeom[j].lon], [streamGeom[j + 1].lat, streamGeom[j + 1].lon]);
+      if (pt) hits.push(pt);
+    }
+  }
+  return hits;
+}
+
+function waterOsmIcon(cls) {
+  return L.divIcon({ className: '', html: `<div class="poi-icon ${cls}"></div>`, iconSize: [12, 12], iconAnchor: [6, 6] });
+}
+
+async function loadOverpassWater() {
+  if (waterOsmStatusEl) waterOsmStatusEl.textContent = '(loading…)';
+
+  const lats = track.map(p => p[0]), lons = track.map(p => p[1]);
+  const midLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+  // Search bbox padded well past the 1-mile cutoff (bbox filter just needs to catch
+  // any node of a candidate way/node; the precise mile cutoff is enforced below).
+  const searchM = WATER_RADIUS_M * 1.5;
+  const latPad = searchM / 111320;
+  const lonPad = searchM / (111320 * Math.cos(midLat * Math.PI / 180));
+  const bbox = [
+    Math.min(...lats) - latPad, Math.min(...lons) - lonPad,
+    Math.max(...lats) + latPad, Math.max(...lons) + lonPad
+  ].join(',');
+
+  const query = `[out:json][timeout:25];(
+    node["natural"="spring"](${bbox});
+    node["natural"="water"](${bbox});
+    node["amenity"="drinking_water"](${bbox});
+    node["man_made"="water_well"](${bbox});
+    node["man_made"="water_tap"](${bbox});
+    way["natural"="water"](${bbox});
+  )->.points;
+  way["waterway"~"^(stream|river)$"](${bbox})->.streams;
+  .points out center tags;
+  .streams out geom tags;`;
+
+  // Overpass's public instances rate-limit anonymous clients (429) and occasionally
+  // 504 under load, so fall through a couple of independently-run mirrors rather
+  // than failing outright on the first busy one.
+  const OVERPASS_ENDPOINTS = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+    'https://overpass.openstreetmap.fr/api/interpreter'
+  ];
+  let res, lastErr;
+  for (const endpoint of OVERPASS_ENDPOINTS) {
+    try {
+      res = await fetch(endpoint, { method: 'POST', body: 'data=' + encodeURIComponent(query) });
+      if (res.ok) { lastErr = null; break; }
+      lastErr = new Error(`${endpoint} returned ${res.status} ${res.statusText}`);
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  if (lastErr) throw lastErr;
+  const data = await res.json();
+
+  poiLayers.waterOsm.clearLayers();
+  let count = 0;
+
+  // Ponds / springs / drinking water / wells within the mile radius.
+  (data.elements || []).forEach(el => {
+    if (!el.tags || el.tags.waterway) return; // stream ways handled separately below
+    const lat = el.type === 'node' ? el.lat : el.center && el.center.lat;
+    const lon = el.type === 'node' ? el.lon : el.center && el.center.lon;
+    if (lat === undefined || lon === undefined) return;
+    const { dist, idx } = nearestTrackInfo(lat, lon);
+    if (dist > WATER_RADIUS_M) return;
+    const tags = el.tags;
+    const label = overpassWaterLabel(tags);
+    const tagLines = Object.entries(tags).map(([k, v]) => `${k} = ${v}`).join('<br>');
+    const osmUrl = `https://www.openstreetmap.org/${el.type}/${el.id}`;
+    const mileTxt = `${(dist * 3.28084).toFixed(0)} ft off-trail, near mile ${(cumDist[idx] / 1609.34).toFixed(1)} of route`;
+    const marker = L.marker([lat, lon], { icon: waterOsmIcon('poi-water-osm') });
+    marker.bindPopup(`<b>${label}</b><br><i>${mileTxt}</i><br>OSM ${el.type} ${el.id}${tagLines ? '<br>' + tagLines : ''}<br><a href="${osmUrl}" target="_blank" rel="noopener">View on OpenStreetMap</a>`);
+    marker.addTo(poiLayers.waterOsm);
+    count++;
+  });
+
+  // Stream/river crossings: where a waterway way's geometry actually intersects our track.
+  const crossings = [];
+  (data.elements || []).forEach(el => {
+    if (!el.tags || !el.tags.waterway || !el.geometry) return;
+    findStreamCrossings(el.geometry).forEach(pt => {
+      crossings.push({ lat: pt[0], lon: pt[1], name: el.tags.name || null, waterway: el.tags.waterway, id: el.id });
+    });
+  });
+  // De-dupe crossings within ~30m of each other (a single physical creek is often
+  // split into several OSM way fragments, which can otherwise double-count one crossing).
+  const keptCrossings = [];
+  crossings.forEach(c => {
+    if (keptCrossings.some(k => haversineMeters(k.lat, k.lon, c.lat, c.lon) < 30)) return;
+    keptCrossings.push(c);
+  });
+  keptCrossings.forEach(c => {
+    const { idx } = nearestTrackInfo(c.lat, c.lon);
+    const label = (c.name || `Unnamed ${c.waterway}`) + ' crossing';
+    const mileTxt = `${(cumDist[idx] / 1609.34).toFixed(1)} mi in`;
+    const osmUrl = `https://www.openstreetmap.org/way/${c.id}`;
+    const marker = L.marker([c.lat, c.lon], { icon: waterOsmIcon('poi-water-crossing') });
+    marker.bindPopup(`<b>${label}</b><br><i>${mileTxt}</i><br>waterway = ${c.waterway}<br><a href="${osmUrl}" target="_blank" rel="noopener">View on OpenStreetMap</a>`);
+    marker.addTo(poiLayers.waterOsm);
+    count++;
+  });
+
+  if (waterOsmStatusEl) waterOsmStatusEl.textContent = `(${count} found)`;
+}
+
+function runOverpassWater() {
+  loadOverpassWater().catch(err => {
+    console.warn('Overpass water fetch failed:', err);
+    if (waterOsmStatusEl) {
+      waterOsmStatusEl.innerHTML = '(unavailable &ndash; <a href="#" id="water-osm-retry">retry</a>)';
+      const retryLink = document.getElementById('water-osm-retry');
+      if (retryLink) retryLink.addEventListener('click', e => { e.preventDefault(); runOverpassWater(); });
+    }
+  });
+}
+
+poiLayers.waterOsm.addTo(map);
+runOverpassWater();
 
 // hover marker synced with elevation/temperature profile
 const hoverMarker = L.marker([start[0], start[1]], { icon: dotIcon('hover-dot'), interactive: false, opacity: 0 }).addTo(map);
@@ -1244,6 +1450,7 @@ function nudgeScrollArea() {
 function relayout(reset) {
   resizeCanvas();
   map.invalidateSize();
+  if (!userAdjustedMap) fitToRoute();
   updateChromeInset(reset);
   nudgeScrollArea();
 }
@@ -1278,6 +1485,7 @@ if (window.ResizeObserver) {
       pending = false;
       resizeCanvas();
       map.invalidateSize();
+      if (!userAdjustedMap) fitToRoute();
       nudgeScrollArea();
     });
   });
@@ -1300,11 +1508,7 @@ if (window.ResizeObserver) {
 // already zoomed or panned themselves.
 window.addEventListener('load', () => {
   relayout(true);
-  map.fitBounds(initialBounds, { padding: [24,24] });
-  setTimeout(() => {
-    relayout(false);
-    map.fitBounds(initialBounds, { padding: [24,24] });
-  }, 350);
+  setTimeout(() => relayout(false), 350);
   setTimeout(() => relayout(false), 1200);
 });
 resizeCanvas();
