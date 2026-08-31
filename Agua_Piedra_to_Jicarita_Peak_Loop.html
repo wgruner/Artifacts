@@ -118,7 +118,7 @@
     #scroll-spacer { min-height: 180px; }
   }
   #profile-wrap {
-    height: 320px;
+    height: 440px;
     flex-shrink: 0;
     background: var(--surface);
     border: 1px solid var(--line);
@@ -403,7 +403,7 @@
     .notes-grid { gap: 7px; }
     .note-item { flex-basis: 100%; padding: 6px 8px; }
     .note-text { font-size: 0.76rem; }
-    #profile-wrap { height: 280px; }
+    #profile-wrap { height: 370px; }
     #itin-panel { padding: 10px 12px; font-size: 0.82rem; }
     #itin-panel h2 { font-size: 0.95rem; }
     .map-header, #profile-header { padding: 10px 12px 6px; }
@@ -482,7 +482,7 @@
       </div>
     </div>
     <div id="profile-wrap">
-      <div id="profile-header">Elevation &amp; Temperature</div>
+      <div id="profile-header">Elevation, Temperature &amp; Precipitation</div>
       <div id="profile-tooltip"></div>
       <div class="profile-section" id="elev-section">
         <canvas id="elev-canvas"></canvas>
@@ -490,6 +490,10 @@
       <div class="profile-divider"></div>
       <div class="profile-section" id="temp-section">
         <canvas id="temp-canvas"></canvas>
+      </div>
+      <div class="profile-divider"></div>
+      <div class="profile-section" id="precip-section">
+        <canvas id="precip-canvas"></canvas>
       </div>
     </div>
   </div>
@@ -523,7 +527,11 @@
       </div>
       <div class="note-item">
         <div class="note-label">About the forecast</div>
-        <div class="note-text">The dates above (Sept 5&ndash;7, 2026) are still well outside any forecast window &mdash; the numbers below are a seasonal estimate, not a forecast, and will be replaced with real data as the trip gets closer. Temperatures on this map are modeled from two reference points: <a href="https://www.weather-atlas.com/en/new-mexico-usa/angel-fire-weather-september" target="_blank" rel="noopener">Angel Fire's September climate normal</a> (valley, ~8,380 ft) and a live <a href="https://www.mountain-forecast.com/peaks/Truchas-Peak/forecasts/3994" target="_blank" rel="noopener">Truchas Peak forecast</a> (~13,100 ft), interpolated by elevation and time of day for Sept 5. A live 7-day <a href="https://www.alltrails.com/trail/us/new-mexico/jicarita-peak" target="_blank" rel="noopener">AllTrails forecast</a> pulled Aug 27 for this same trail ran noticeably warmer &mdash; 73&ndash;79&deg;F highs, 51&ndash;57&deg;F lows &mdash; than the modeled numbers below. That's expected: it's both about 9 days earlier in the season and anchored near the trailhead rather than the peak, so it doesn't capture how cold the high country gets by early September.</div>
+        <div class="note-text" id="forecast-note-text">The dates above (Sept 5&ndash;7, 2026) are still well outside any forecast window &mdash; the numbers below are a seasonal estimate, not a forecast, and will be replaced with real data as the trip gets closer. Temperatures on this map are modeled from two reference points: <a href="https://www.weather-atlas.com/en/new-mexico-usa/angel-fire-weather-september" target="_blank" rel="noopener">Angel Fire's September climate normal</a> (valley, ~8,380 ft) and a live <a href="https://www.mountain-forecast.com/peaks/Truchas-Peak/forecasts/3994" target="_blank" rel="noopener">Truchas Peak forecast</a> (~13,100 ft), interpolated by elevation and time of day for Sept 5. A live 7-day <a href="https://www.alltrails.com/trail/us/new-mexico/jicarita-peak" target="_blank" rel="noopener">AllTrails forecast</a> pulled Aug 27 for this same trail ran noticeably warmer &mdash; 73&ndash;79&deg;F highs, 51&ndash;57&deg;F lows &mdash; than the modeled numbers below. That's expected: it's both about 9 days earlier in the season and anchored near the trailhead rather than the peak, so it doesn't capture how cold the high country gets by early September. <em>(Loading a live forecast now&hellip;)</em></div>
+      </div>
+      <div class="note-item">
+        <div class="note-label">Trail status &amp; closures</div>
+        <div class="note-text">This route isn't monitored by any weather station, but it is monitored by the trail org: check <a href="https://santafetotaos.org/" target="_blank" rel="noopener">santafetotaos.org</a> before heading out for active fire closures, trail conditions, and other alerts along the Santa Fe to Taos Trail corridor. As of Aug 31, 2026 there's an active Frijoles Fire closure on the Skyline Trail near the Santa Fe Ski Basin (Sections 1&ndash;2), which does not overlap this route through Section 4 (Agua Piedra to Jicarita Peak) &mdash; but conditions change, so it's worth a check again close to the trip.</div>
       </div>
       <div class="note-item">
         <div class="note-label">Algae &amp; water safety</div>
@@ -568,6 +576,14 @@ for (let i = 0; i < track.length; i++) {
 const milesTotal = (totalDist / 1609.34).toFixed(1);
 const gainFt = Math.round(gain * 3.28084).toLocaleString();
 const lossFt = Math.round(loss * 3.28084).toLocaleString();
+
+// Highest point (Jicarita Peak) — found early so both the temperature
+// model and the live-forecast fetch below can use its coordinates.
+let peakIdx = 0;
+for (let i = 1; i < track.length; i++) {
+  if (track[i][2] > track[peakIdx][2]) peakIdx = i;
+}
+const peak = track[peakIdx];
 
 // ---------- Map ----------
 const latlngs = track.map(p => [p[0], p[1]]);
@@ -667,7 +683,8 @@ const dayLabels = [
 const dayStartHours = [12, 7, 7];
 
 // ---------- Hiking pace / temperature model ----------
-// Two reference points, calibrated against real conditions rather than a
+// Fallback model, used until (or unless) the live Open-Meteo fetch below
+// succeeds. Two reference points, calibrated against real conditions rather than a
 // single valley station extrapolated with a flat lapse rate:
 //  - Angel Fire, NM (~8,380 ft / 2554 m): September climate-normal
 //    high 68.5°F / low 44.6°F.
@@ -767,26 +784,151 @@ itinBody.innerHTML += `
 
 const tempAtPoint = new Array(track.length).fill(0);
 const hourAtPoint = new Array(track.length).fill(0);
-for (let d = 0; d < 3; d++) {
-  const i0 = dayBreaks[d], i1 = dayBreaks[d+1];
-  let climbSoFar = 0;
-  for (let i = i0; i <= i1; i++) {
-    if (i > i0) {
-      const de = track[i][2] - track[i-1][2];
-      if (de > 0) climbSoFar += de;
+let minTemp, maxTemp;
+
+// Per-day calibration inputs, one entry per trip day. Default to the
+// modeled reference points above; loadLiveForecast() below overwrites
+// these with real per-day highs/lows when a live fetch succeeds, then
+// calls rebuildTempModel() again — same interpolation, better inputs.
+let dayMeanRef = [MEAN_REF, MEAN_REF, MEAN_REF];
+let dayAmpRef = [AMP_REF, AMP_REF, AMP_REF];
+let dayMeanHigh = [MEAN_HIGH, MEAN_HIGH, MEAN_HIGH];
+let dayAmpHigh = [AMP_HIGH, AMP_HIGH, AMP_HIGH];
+
+function rebuildTempModel() {
+  for (let d = 0; d < 3; d++) {
+    const i0 = dayBreaks[d], i1 = dayBreaks[d+1];
+    const meanLapse = (dayMeanRef[d] - dayMeanHigh[d]) / (HIGH_ELEV_M - REF_ELEV_M);
+    const ampLapse = (dayAmpRef[d] - dayAmpHigh[d]) / (HIGH_ELEV_M - REF_ELEV_M);
+    let climbSoFar = 0;
+    for (let i = i0; i <= i1; i++) {
+      if (i > i0) {
+        const de = track[i][2] - track[i-1][2];
+        if (de > 0) climbSoFar += de;
+      }
+      const elapsedMiles = (cumDist[i] - cumDist[i0]) / 1609.34;
+      const elapsedHrs = elapsedMiles / PACE_MPH + climbSoFar * CLIMB_HR_PER_M;
+      const hourOfDay = (dayStartHours[d] + elapsedHrs) % 24;
+      hourAtPoint[i] = hourOfDay;
+      const elevM = track[i][2];
+      const mean = dayMeanRef[d] - meanLapse * (elevM - REF_ELEV_M);
+      const amp = Math.max(AMP_MIN, dayAmpRef[d] - ampLapse * (elevM - REF_ELEV_M));
+      tempAtPoint[i] = diurnalTemp(hourOfDay, mean - amp, mean + amp);
     }
-    const elapsedMiles = (cumDist[i] - cumDist[i0]) / 1609.34;
-    const elapsedHrs = elapsedMiles / PACE_MPH + climbSoFar * CLIMB_HR_PER_M;
-    const hourOfDay = (dayStartHours[d] + elapsedHrs) % 24;
-    hourAtPoint[i] = hourOfDay;
-    const elevM = track[i][2];
-    const mean = MEAN_REF - MEAN_LAPSE_F_PER_M * (elevM - REF_ELEV_M);
-    const amp = Math.max(AMP_MIN, AMP_REF - AMP_LAPSE_F_PER_M * (elevM - REF_ELEV_M));
-    tempAtPoint[i] = diurnalTemp(hourOfDay, mean - amp, mean + amp);
+  }
+  minTemp = Math.min(...tempAtPoint);
+  maxTemp = Math.max(...tempAtPoint);
+}
+rebuildTempModel();
+
+// Precipitation has no seasonal-normal fallback — it's only ever live
+// data (or nothing). hasPrecipData gates the chart between "waiting for
+// a fetch" and "here's the real hourly-interpolated series."
+const precipAtPoint = new Array(track.length).fill(0);
+let minPrecip = 0, maxPrecip = 10;
+let hasPrecipData = false;
+let liveHourlyTrailhead = null, liveHourlyPeak = null;
+
+function rebuildPrecipModel() {
+  if (!liveHourlyTrailhead || !liveHourlyPeak) { hasPrecipData = false; return; }
+  const thPrecip = liveHourlyTrailhead.precipitation_probability;
+  const pkPrecip = liveHourlyPeak.precipitation_probability;
+  for (let d = 0; d < 3; d++) {
+    const i0 = dayBreaks[d], i1 = dayBreaks[d+1];
+    for (let i = i0; i <= i1; i++) {
+      // hourAtPoint was just filled by rebuildTempModel(); reuse it to
+      // look up the matching hour(s) in the two hourly series, then
+      // interpolate in time (between hours) and in space (by elevation,
+      // same two reference points as the temperature model).
+      const absHour = 24 * d + hourAtPoint[i];
+      const lo = Math.min(Math.floor(absHour), thPrecip.length - 1);
+      const hi = Math.min(lo + 1, thPrecip.length - 1);
+      const frac = absHour - lo;
+      const thVal = thPrecip[lo] + (thPrecip[hi] - thPrecip[lo]) * frac;
+      const pkVal = pkPrecip[lo] + (pkPrecip[hi] - pkPrecip[lo]) * frac;
+      const elevFrac = Math.max(0, Math.min(1, (track[i][2] - REF_ELEV_M) / (HIGH_ELEV_M - REF_ELEV_M)));
+      precipAtPoint[i] = thVal + (pkVal - thVal) * elevFrac;
+    }
+  }
+  maxPrecip = Math.max(10, Math.max(...precipAtPoint));
+  hasPrecipData = true;
+}
+
+// ---------- Live forecast (Open-Meteo) ----------
+// The dates above are now within the ~10-day window most forecast models
+// actually cover, so try to replace the seasonal-normal calibration with
+// a real hourly forecast, fetched directly from the browser — no key, no
+// server, CORS-enabled: https://open-meteo.com/en/docs (CC BY 4.0, needs
+// attribution). Sampled at the trailhead and at Jicarita Peak's own
+// coordinates/elevation (rather than proxy stations), one day at a time,
+// then run through the same elevation/time-of-day interpolation as the
+// fallback model above. Fails silently back to that fallback if the
+// fetch errors or a trip date ever falls outside the forecast horizon.
+const TRIP_DATES = ['2026-09-05', '2026-09-06', '2026-09-07'];
+const forecastNoteEl = document.getElementById('forecast-note-text');
+
+function dayMinMax(hourly, dateStr, key) {
+  const vals = hourly.time
+    .map((t, i) => [t, hourly[key][i]])
+    .filter(([t]) => t.startsWith(dateStr))
+    .map(([, v]) => v);
+  return vals.length ? vals : null;
+}
+
+async function loadLiveForecast() {
+  const points = [track[0], peak]; // [trailhead, peak]
+  const lat = points.map(p => p[0]).join(',');
+  const lon = points.map(p => p[1]).join(',');
+  const elev = points.map(p => p[2]).join(',');
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+    `&elevation=${elev}&hourly=temperature_2m,precipitation_probability,windspeed_10m` +
+    `&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=America%2FDenver` +
+    `&start_date=${TRIP_DATES[0]}&end_date=${TRIP_DATES[TRIP_DATES.length - 1]}`;
+
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Open-Meteo HTTP ${res.status}`);
+  const [th, pk] = await res.json();
+  if (!th || !pk || th.error || pk.error) throw new Error('Open-Meteo returned an error payload');
+
+  const newMeanRef = [], newAmpRef = [], newMeanHigh = [], newAmpHigh = [];
+  const daySummaries = [];
+  for (let d = 0; d < 3; d++) {
+    const tTemps = dayMinMax(th.hourly, TRIP_DATES[d], 'temperature_2m');
+    const pTemps = dayMinMax(pk.hourly, TRIP_DATES[d], 'temperature_2m');
+    const pPrecip = dayMinMax(pk.hourly, TRIP_DATES[d], 'precipitation_probability');
+    const pWind = dayMinMax(pk.hourly, TRIP_DATES[d], 'windspeed_10m');
+    if (!tTemps || !pTemps) throw new Error(`No live data for ${TRIP_DATES[d]}`);
+    const tLow = Math.min(...tTemps), tHigh = Math.max(...tTemps);
+    const pLow = Math.min(...pTemps), pHigh = Math.max(...pTemps);
+    newMeanRef.push((tHigh + tLow) / 2);
+    newAmpRef.push(Math.max(AMP_MIN, (tHigh - tLow) / 2));
+    newMeanHigh.push((pHigh + pLow) / 2);
+    newAmpHigh.push(Math.max(AMP_MIN, (pHigh - pLow) / 2));
+    daySummaries.push(`Day ${d + 1}: ${Math.round(pLow)}&ndash;${Math.round(pHigh)}&deg;F near the peak, ` +
+      `up to ${Math.round(Math.max(...pPrecip))}% precip chance, winds to ${Math.round(Math.max(...pWind))} mph`);
+  }
+  dayMeanRef = newMeanRef; dayAmpRef = newAmpRef;
+  dayMeanHigh = newMeanHigh; dayAmpHigh = newAmpHigh;
+  rebuildTempModel();
+  if (typeof drawTemp === 'function') drawTemp(-1);
+
+  liveHourlyTrailhead = th.hourly;
+  liveHourlyPeak = pk.hourly;
+  rebuildPrecipModel();
+  if (typeof drawPrecip === 'function') drawPrecip(-1);
+
+  if (forecastNoteEl) {
+    const pulled = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+    forecastNoteEl.innerHTML = `<strong>Live forecast</strong> pulled from <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> on ${pulled}, sampled directly at the trailhead and at Jicarita Peak's coordinates/elevation and interpolated by elevation and time of day along the route, same as the modeled estimate this replaces. ${daySummaries.join(' &middot; ')}. Cross-check against a live <a href="https://www.mountain-forecast.com/peaks/Truchas-Peak/forecasts/3994" target="_blank" rel="noopener">Truchas Peak forecast</a> and the <a href="https://www.alltrails.com/trail/us/new-mexico/jicarita-peak" target="_blank" rel="noopener">AllTrails forecast</a> for this trail &mdash; any single model can miss fast-moving mountain weather, especially above treeline. This pull happens fresh every time the page loads (no caching), and will automatically revert to the seasonal estimate once Sept 5&ndash;7 falls outside the forecast window &mdash; i.e. once the trip has passed.`;
   }
 }
-const minTemp = Math.min(...tempAtPoint);
-const maxTemp = Math.max(...tempAtPoint);
+
+loadLiveForecast().catch(err => {
+  console.warn('Live forecast unavailable, showing modeled estimate instead:', err);
+  if (forecastNoteEl) {
+    forecastNoteEl.innerHTML += ' <em>(A live-forecast update was attempted on page load and failed, so the estimate above is still the seasonal model, not live data. Reload the page, or check the linked sources directly.)</em>';
+  }
+});
 
 // Start / end markers
 function dotIcon(cls) {
@@ -798,12 +940,7 @@ L.marker([start[0], start[1]], { icon: dotIcon('marker-label') })
   .addTo(map)
   .bindPopup(`<b>Start</b><br>${Math.round(start[2]*3.28084).toLocaleString()} ft`);
 
-// find highest point (Jicarita Peak) for a marker
-let peakIdx = 0;
-for (let i = 1; i < track.length; i++) {
-  if (track[i][2] > track[peakIdx][2]) peakIdx = i;
-}
-const peak = track[peakIdx];
+// peak/peakIdx (Jicarita Peak) were found earlier, alongside the temperature model
 L.marker([peak[0], peak[1]], { icon: dotIcon('marker-label') })
   .addTo(map)
   .bindPopup(`<b>Jicarita Peak (high point)</b><br>${Math.round(peak[2]*3.28084).toLocaleString()} ft<br>${(cumDist[peakIdx]/1609.34).toFixed(1)} mi in`);
@@ -871,6 +1008,7 @@ trackLine.on('mouseout', function() {
   hoverMarker.setOpacity(0);
   drawElevation(-1);
   drawTemp(-1);
+  drawPrecip(-1);
 });
 
 // ---------- Elevation + temperature profile ----------
@@ -878,17 +1016,20 @@ const elevCanvas = document.getElementById('elev-canvas');
 const elevCtx = elevCanvas.getContext('2d');
 const tempCanvas = document.getElementById('temp-canvas');
 const tempCtx = tempCanvas.getContext('2d');
+const precipCanvas = document.getElementById('precip-canvas');
+const precipCtx = precipCanvas.getContext('2d');
 const tooltip = document.getElementById('profile-tooltip');
 const profileWrap = document.getElementById('profile-wrap');
 
 function resizeCanvas() {
-  [elevCanvas, tempCanvas].forEach(c => {
+  [elevCanvas, tempCanvas, precipCanvas].forEach(c => {
     const rect = c.getBoundingClientRect();
     c.width = rect.width * devicePixelRatio;
     c.height = rect.height * devicePixelRatio;
   });
   drawElevation(-1);
   drawTemp(-1);
+  drawPrecip(-1);
 }
 
 function drawSeries(ctx, canvas, values, valMin, valMax, hoverIndex, opts) {
@@ -982,13 +1123,34 @@ function drawTemp(hoverIndex) {
   });
 }
 
+function drawPrecip(hoverIndex) {
+  if (!hasPrecipData) {
+    precipCtx.clearRect(0, 0, precipCanvas.width, precipCanvas.height);
+    precipCtx.fillStyle = '#918b7c';
+    precipCtx.font = `${12.5 * devicePixelRatio}px sans-serif`;
+    precipCtx.textAlign = 'center';
+    precipCtx.fillText('Precipitation forecast unavailable', precipCanvas.width / 2, precipCanvas.height / 2);
+    precipCtx.textAlign = 'left';
+    return;
+  }
+  drawSeries(precipCtx, precipCanvas, precipAtPoint, 0, maxPrecip, hoverIndex, {
+    fill: 'rgba(22,160,133,0.16)',
+    stroke: '#16a085',
+    maxLabel: Math.round(maxPrecip) + '%',
+    minLabel: '0%',
+    showMiles: true
+  });
+}
+
 function showHover(idx) {
   const p = track[idx];
   hoverMarker.setLatLng([p[0], p[1]]);
   hoverMarker.setOpacity(1);
   drawElevation(idx);
   drawTemp(idx);
-  tooltip.textContent = `${(cumDist[idx]/1609.34).toFixed(2)} mi · ${Math.round(p[2]*3.28084).toLocaleString()} ft · ${Math.round(tempAtPoint[idx])}°F · ${fmtHour(hourAtPoint[idx])}`;
+  drawPrecip(idx);
+  const precipTxt = hasPrecipData ? ` · ${Math.round(precipAtPoint[idx])}% precip` : '';
+  tooltip.textContent = `${(cumDist[idx]/1609.34).toFixed(2)} mi · ${Math.round(p[2]*3.28084).toLocaleString()} ft · ${Math.round(tempAtPoint[idx])}°F${precipTxt} · ${fmtHour(hourAtPoint[idx])}`;
 }
 
 function indexFromClientX(clientX) {
@@ -1010,6 +1172,7 @@ profileWrap.addEventListener('mouseleave', () => {
   hoverMarker.setOpacity(0);
   drawElevation(-1);
   drawTemp(-1);
+  drawPrecip(-1);
   tooltip.textContent = '';
 });
 
@@ -1125,9 +1288,23 @@ if (window.ResizeObserver) {
 // Map tiles and fonts land after first paint, so run the whole relayout once
 // everything has settled — and again shortly after, since Safari's bottom bar
 // is fully expanded on load and gives the truest chrome measurement then.
+//
+// The very first fitBounds() call (above, at script load) can be measured
+// against a #map container that hasn't reached its final size yet — the
+// aspect-ratio/flex layout it depends on can still be settling a frame or
+// two later. invalidateSize() alone doesn't fix that: it keeps whatever
+// center/zoom is already set, it doesn't re-fit. So re-run fitBounds()
+// here too, once layout has actually settled, to correct an initial view
+// that locked in before the container was full size. Only done on load,
+// not on every relayout() call, so it never overrides a view the user has
+// already zoomed or panned themselves.
 window.addEventListener('load', () => {
   relayout(true);
-  setTimeout(() => relayout(false), 350);
+  map.fitBounds(initialBounds, { padding: [24,24] });
+  setTimeout(() => {
+    relayout(false);
+    map.fitBounds(initialBounds, { padding: [24,24] });
+  }, 350);
   setTimeout(() => relayout(false), 1200);
 });
 resizeCanvas();
@@ -1182,6 +1359,7 @@ profileWrap.addEventListener('touchend', () => {
   hoverMarker.setOpacity(0);
   drawElevation(-1);
   drawTemp(-1);
+  drawPrecip(-1);
   tooltip.textContent = '';
   touchMode = null;
 });
