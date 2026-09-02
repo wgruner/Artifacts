@@ -439,7 +439,8 @@
     background: var(--paper);
     border-left: 3px solid var(--line);
   }
-  .itin-day .itin-label { font-weight: 700; }
+  .itin-day .itin-label { font-weight: 700; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .itin-day .itin-temp { font-weight: 600; color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
   .itin-day .itin-stats { color: var(--muted); font-size: 0.8rem; }
   .itin-totals {
     background: rgba(199,185,154,0.35);
@@ -887,7 +888,7 @@ for (let d = 0; d < 3; d++) {
 
   itinBody.innerHTML += `
     <div class="itin-day" style="background:${dayColorsSoft[d]}; border-left-color:${dayColors[d]};">
-      <div class="itin-label">Day ${d+1}</div>
+      <div class="itin-label">Day ${d+1}<span class="itin-temp" id="itin-temp-${d}"></span></div>
       <div class="itin-stats">${sentence}</div>
     </div>`;
 }
@@ -900,6 +901,12 @@ itinBody.innerHTML += `
 
 const tempAtPoint = new Array(track.length).fill(0);
 const hourAtPoint = new Array(track.length).fill(0);
+// The diurnal low/high *at each point's elevation*, independent of the hour
+// actually hiked there — used for the itinerary's daily high/low badges,
+// which should reflect the full day (including hours spent in camp), not
+// just the temperature swing encountered while moving (that's tempAtPoint).
+const dayLowAtPoint = new Array(track.length).fill(0);
+const dayHighAtPoint = new Array(track.length).fill(0);
 let minTemp, maxTemp;
 
 // Per-day calibration inputs, one entry per trip day. Default to the
@@ -930,12 +937,34 @@ function rebuildTempModel() {
       const mean = dayMeanRef[d] - meanLapse * (elevM - REF_ELEV_M);
       const amp = Math.max(AMP_MIN, dayAmpRef[d] - ampLapse * (elevM - REF_ELEV_M));
       tempAtPoint[i] = diurnalTemp(hourOfDay, mean - amp, mean + amp);
+      dayLowAtPoint[i] = mean - amp;
+      dayHighAtPoint[i] = mean + amp;
     }
   }
   minTemp = Math.min(...tempAtPoint);
   maxTemp = Math.max(...tempAtPoint);
 }
 rebuildTempModel();
+
+// Fills in each itinerary day's high/low badge with that day's overall
+// high and low — the full diurnal swing at each elevation the day's segment
+// touches (including the overnight camp), not just the narrower range of
+// temperatures actually encountered during the hours spent hiking (that
+// narrower range is what the temp graph below shows). Re-run after
+// rebuildTempModel() so the badges pick up live forecast data too.
+function updateItinTemps() {
+  for (let d = 0; d < 3; d++) {
+    const i0 = dayBreaks[d], i1 = dayBreaks[d+1];
+    let lo = Infinity, hi = -Infinity;
+    for (let i = i0; i <= i1; i++) {
+      if (dayLowAtPoint[i] < lo) lo = dayLowAtPoint[i];
+      if (dayHighAtPoint[i] > hi) hi = dayHighAtPoint[i];
+    }
+    const el = document.getElementById(`itin-temp-${d}`);
+    if (el) el.textContent = `${Math.round(lo)}–${Math.round(hi)}°F`;
+  }
+}
+updateItinTemps();
 
 // Precipitation has no seasonal-normal fallback — it's only ever live
 // data (or nothing). hasPrecipData gates the chart between "waiting for
@@ -1026,6 +1055,7 @@ async function loadLiveForecast() {
   dayMeanRef = newMeanRef; dayAmpRef = newAmpRef;
   dayMeanHigh = newMeanHigh; dayAmpHigh = newAmpHigh;
   rebuildTempModel();
+  updateItinTemps();
   if (typeof drawTemp === 'function') drawTemp(-1);
 
   liveHourlyTrailhead = th.hourly;
