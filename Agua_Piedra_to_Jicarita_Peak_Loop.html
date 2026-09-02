@@ -174,13 +174,12 @@
     color: var(--accent-dark);
     touch-action: pan-y;
   }
-  #profile-tooltip {
+  #profile-footer {
     flex-shrink: 0;
     font-size: 0.75rem;
     font-weight: 600;
     color: var(--ink);
-    background: var(--paper);
-    border-bottom: 1px solid var(--line);
+    border-top: 1px solid var(--line);
     padding: 0 14px;
     height: 28px;
     display: flex;
@@ -189,7 +188,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-
   .marker-label {
     background: var(--accent);
     color: white;
@@ -225,9 +223,12 @@
   }
   .poi-camp { background: #6ba362; width: 18px; height: 18px; }
   .poi-camp-highlight { background: #4d8546; width: 24px; height: 24px; font-size: 12px; box-shadow: 0 0 0 3px rgba(107,163,98,0.3), 0 1px 4px rgba(0,0,0,0.4); }
+  /* The ★ glyph's ink sits visibly low-and-right of its own em-box in this font,
+     so flex centering alone leaves it looking off-center — nudge the glyph itself. */
+  .poi-camp-highlight .glyph { display: inline-block; transform: translate(-0.16px, -0.4px); }
   .poi-water { background: #5b93c4; width: 16px; height: 16px; }
   .poi-parking { background: #938c7a; width: 14px; height: 14px; }
-  .poi-note { background: #c7b99a; width: 16px; height: 16px; }
+  .poi-note { background: #e0b400; width: 16px; height: 16px; }
 
   #poi-panel {
     position: absolute;
@@ -244,6 +245,8 @@
   #poi-panel label { display: flex; align-items: center; gap: 7px; margin: 4px 0; cursor: pointer; }
   #poi-panel .swatch { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
   #poi-panel .swatch.line { width: 14px; height: 3px; border-radius: 2px; }
+  #poi-panel .swatch.star { width: 13px; height: 13px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 8px; line-height: 1; }
+  #poi-panel .swatch.star .glyph { display: inline-block; transform: translate(-0.17px, -0.43px); }
   #poi-panel .divider { border-top: 1px solid var(--line); margin: 7px 0; }
   #poi-panel .section-title { font-weight: 700; color: var(--muted); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 2px; }
 
@@ -374,8 +377,8 @@
     flex: 1 1 220px;
     padding: 8px 11px;
     border-radius: var(--radius-sm);
-    background: var(--paper);
-    border-left: 3px solid var(--line);
+    background: rgba(224,180,0,0.16);
+    border-left: 3px solid #e0b400;
   }
   .note-label {
     font-weight: 700;
@@ -443,8 +446,8 @@
   .itin-day .itin-temp { font-weight: 600; color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
   .itin-day .itin-stats { color: var(--muted); font-size: 0.8rem; }
   .itin-totals {
-    background: rgba(199,185,154,0.35);
-    border-left-color: #c7b99a;
+    background: rgba(224,180,0,0.16);
+    border-left-color: #e0b400;
   }
 
   @media (max-width: 680px) {
@@ -477,7 +480,7 @@
     }
     #poi-panel .section-title { font-size: 0.62rem; }
     #poi-panel label { margin: 3px 0; }
-    #profile-tooltip { font-size: 0.66rem; }
+    #profile-footer { font-size: 0.66rem; }
   }
 
   /* Landscape tablets and desktop: map and graph sit side by side, each
@@ -532,8 +535,9 @@
             <span class="panel-chevron">▾</span>
           </button>
           <div class="panel-body" id="poi-panel-body">
-            <label><input type="checkbox" id="toggle-camp" checked><span class="swatch" style="background:#6ba362"></span>Campsites</label>
-            <label><input type="checkbox" id="toggle-note"><span class="swatch" style="background:#c7b99a"></span>Notes</label>
+            <label><input type="checkbox" id="toggle-camp-ours" checked><span class="swatch star" style="background:#4d8546"><span class="glyph">★</span></span>Campsites</label>
+            <label><input type="checkbox" id="toggle-camp-sf2t" checked><span class="swatch" style="background:#6ba362"></span>Campsites (SF2T)</label>
+            <label><input type="checkbox" id="toggle-note"><span class="swatch" style="background:#e0b400"></span>Notes</label>
             <label><input type="checkbox" id="toggle-water" checked><span class="swatch" style="background:#5b93c4"></span>Water<span id="water-osm-status" style="color:var(--muted); font-size:0.8em; margin-left:4px;"></span></label>
             <!-- Parking dropped from the legend for now (not useful yet) — layer/data plumbing left in place below, just not shown or wired to a toggle. -->
           </div>
@@ -543,7 +547,6 @@
     </div>
     <div id="profile-wrap">
       <div id="profile-header">Elevation, Temperature &amp; Precipitation</div>
-      <div id="profile-tooltip"></div>
       <div class="profile-section" id="elev-section">
         <canvas id="elev-canvas"></canvas>
       </div>
@@ -555,6 +558,7 @@
       <div class="profile-section" id="precip-section">
         <canvas id="precip-canvas"></canvas>
       </div>
+      <div id="profile-footer"></div>
     </div>
   </div>
   <div id="energy-card">
@@ -645,7 +649,6 @@ for (let i = 0; i < track.length; i++) {
   }
 }
 
-const milesTotal = (totalDist / 1609.34).toFixed(1);
 const gainFt = Math.round(gain * 3.28084).toLocaleString();
 const lossFt = Math.round(loss * 3.28084).toLocaleString();
 
@@ -1097,12 +1100,12 @@ const poiData = [{"lat": 36.121339, "lon": -105.529513, "name": "Water - Agua Pi
 // names (case-insensitive substring match) that our group is definitely camping at
 const plannedCamps = ['los esteros', 'serpent lake'];
 
-const poiLayers = { camp: L.layerGroup(), water: L.layerGroup(), parking: L.layerGroup(), note: L.layerGroup(), waterLive: L.layerGroup() };
+const poiLayers = { campOurs: L.layerGroup(), camp: L.layerGroup(), water: L.layerGroup(), parking: L.layerGroup(), note: L.layerGroup(), waterLive: L.layerGroup() };
 
 function poiIcon(cat, highlight) {
   const cls = highlight ? 'poi-camp poi-camp-highlight' : 'poi-' + cat;
   const size = highlight ? 24 : (cat === 'camp' ? 18 : cat === 'water' ? 16 : cat === 'parking' ? 14 : cat === 'note' ? 16 : 10);
-  const label = highlight ? '★' : '';
+  const label = highlight ? '<span class="glyph">★</span>' : '';
   return L.divIcon({
     className: '',
     html: `<div class="poi-icon ${cls}">${label}</div>`,
@@ -1116,15 +1119,19 @@ poiData.forEach(p => {
   const marker = L.marker([p.lat, p.lon], { icon: poiIcon(p.cat, isPlanned) });
   const mileTxt = p.mile ? `mile ${p.mile.replace(/\.$/,'')}` : '';
   marker.bindPopup(`<b>${isPlanned ? '★ ' : ''}${p.name}</b>${mileTxt ? '<br><i>' + mileTxt + '</i>' : ''}${p.desc ? '<br>' + p.desc : ''}`);
-  marker.addTo(poiLayers[p.cat]);
+  marker.addTo(poiLayers[isPlanned ? 'campOurs' : p.cat]);
 });
 
+poiLayers.campOurs.addTo(map);
 poiLayers.camp.addTo(map);
 poiLayers.water.addTo(map);
 // notes off by default to reduce clutter
 // parking left out of the map for now — poiLayers.parking still holds its markers, just unattached and without a legend toggle
 
-document.getElementById('toggle-camp').addEventListener('change', e => {
+document.getElementById('toggle-camp-ours').addEventListener('change', e => {
+  e.target.checked ? poiLayers.campOurs.addTo(map) : map.removeLayer(poiLayers.campOurs);
+});
+document.getElementById('toggle-camp-sf2t').addEventListener('change', e => {
   e.target.checked ? poiLayers.camp.addTo(map) : map.removeLayer(poiLayers.camp);
 });
 document.getElementById('toggle-water').addEventListener('change', e => {
@@ -1328,6 +1335,7 @@ trackLine.on('mouseout', function() {
   drawElevation(-1);
   drawTemp(-1);
   drawPrecip(-1);
+  profileFooter.textContent = '';
 });
 
 // ---------- Elevation + temperature profile ----------
@@ -1337,8 +1345,8 @@ const tempCanvas = document.getElementById('temp-canvas');
 const tempCtx = tempCanvas.getContext('2d');
 const precipCanvas = document.getElementById('precip-canvas');
 const precipCtx = precipCanvas.getContext('2d');
-const tooltip = document.getElementById('profile-tooltip');
 const profileWrap = document.getElementById('profile-wrap');
+const profileFooter = document.getElementById('profile-footer');
 
 function resizeCanvas() {
   [elevCanvas, tempCanvas, precipCanvas].forEach(c => {
@@ -1355,8 +1363,8 @@ function drawSeries(ctx, canvas, values, valMin, valMax, hoverIndex, opts) {
   const w = canvas.width, h = canvas.height;
   ctx.clearRect(0, 0, w, h);
   const padL = 8 * devicePixelRatio, padR = 8 * devicePixelRatio;
-  const padT = 22 * devicePixelRatio;
-  const padB = (opts.showMiles ? 44 : 28) * devicePixelRatio;
+  const padT = 10 * devicePixelRatio;
+  const padB = 28 * devicePixelRatio;
   const plotW = w - padL - padR, plotH = h - padT - padB;
   const range = (valMax - valMin) || 1;
 
@@ -1382,19 +1390,6 @@ function drawSeries(ctx, canvas, values, valMin, valMax, hoverIndex, opts) {
   ctx.strokeStyle = opts.stroke;
   ctx.lineWidth = 2 * devicePixelRatio;
   ctx.stroke();
-
-  // axis labels — drawn outside the plot area (in the padT/padB margins)
-  // so they never sit on top of the curve or its fill.
-  ctx.fillStyle = '#5c5647';
-  ctx.font = `bold ${12.5 * devicePixelRatio}px sans-serif`;
-  ctx.fillText(opts.maxLabel, padL, padT - 7 * devicePixelRatio);
-  ctx.fillText(opts.minLabel, padL, padT + plotH + 21 * devicePixelRatio);
-  if (opts.showMiles) {
-    ctx.fillText('0 mi', padL, h - 6*devicePixelRatio);
-    ctx.textAlign = 'right';
-    ctx.fillText(milesTotal + ' mi', padL + plotW, h - 6*devicePixelRatio);
-    ctx.textAlign = 'left';
-  }
 
   // day-color bar along the bottom to tie the graph to the itinerary
   for (let d = 0; d < 3; d++) {
@@ -1425,10 +1420,7 @@ function drawSeries(ctx, canvas, values, valMin, valMax, hoverIndex, opts) {
 function drawElevation(hoverIndex) {
   drawSeries(elevCtx, elevCanvas, track.map(p => p[2]), minEle, maxEle, hoverIndex, {
     fill: 'rgba(52,73,94,0.14)',
-    stroke: '#34495e',
-    maxLabel: Math.round(maxEle*3.28084).toLocaleString() + ' ft',
-    minLabel: Math.round(minEle*3.28084).toLocaleString() + ' ft',
-    showMiles: false
+    stroke: '#34495e'
   });
 }
 
@@ -1436,10 +1428,7 @@ function drawTemp(hoverIndex) {
   // Yellow, matching Apple Weather's temperature color.
   drawSeries(tempCtx, tempCanvas, tempAtPoint, minTemp, maxTemp, hoverIndex, {
     fill: 'rgba(255,204,0,0.18)',
-    stroke: '#ffcc00',
-    maxLabel: Math.round(maxTemp) + '°F',
-    minLabel: Math.round(minTemp) + '°F',
-    showMiles: true
+    stroke: '#ffcc00'
   });
 }
 
@@ -1456,10 +1445,7 @@ function drawPrecip(hoverIndex) {
   // Blue reads as "water/rain" more intuitively than the previous teal-green.
   drawSeries(precipCtx, precipCanvas, precipAtPoint, 0, maxPrecip, hoverIndex, {
     fill: 'rgba(52,152,219,0.16)',
-    stroke: '#3498db',
-    maxLabel: Math.round(maxPrecip) + '%',
-    minLabel: '0%',
-    showMiles: true
+    stroke: '#3498db'
   });
 }
 
@@ -1471,7 +1457,7 @@ function showHover(idx) {
   drawTemp(idx);
   drawPrecip(idx);
   const precipTxt = hasPrecipData ? ` · ${Math.round(precipAtPoint[idx])}% precip` : '';
-  tooltip.textContent = `${(cumDist[idx]/1609.34).toFixed(2)} mi · ${Math.round(p[2]*3.28084).toLocaleString()} ft · ${Math.round(tempAtPoint[idx])}°F${precipTxt} · ${fmtHour(hourAtPoint[idx])}`;
+  profileFooter.textContent = `${(cumDist[idx]/1609.34).toFixed(2)} mi · ${Math.round(p[2]*3.28084).toLocaleString()} ft · ${Math.round(tempAtPoint[idx])}°F${precipTxt} · ${fmtHour(hourAtPoint[idx])}`;
 }
 
 function indexFromClientX(clientX) {
@@ -1494,7 +1480,7 @@ profileWrap.addEventListener('mouseleave', () => {
   drawElevation(-1);
   drawTemp(-1);
   drawPrecip(-1);
-  tooltip.textContent = '';
+  profileFooter.textContent = '';
 });
 
 // ---------- Bottom reserve + scrollable-area maintenance ----------
@@ -1679,7 +1665,7 @@ profileWrap.addEventListener('touchend', () => {
   drawElevation(-1);
   drawTemp(-1);
   drawPrecip(-1);
-  tooltip.textContent = '';
+  profileFooter.textContent = '';
   touchMode = null;
 });
 </script>
