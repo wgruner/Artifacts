@@ -315,6 +315,42 @@
   }
   #energy-body .itin-day { flex: 1 1 220px; }
 
+  #gear-card {
+    flex-shrink: 0;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 12px 16px;
+  }
+  #gear-card h2 {
+    margin: 0 0 8px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--accent-dark);
+  }
+  .gear-intro {
+    font-size: 0.85rem;
+    color: var(--muted);
+    line-height: 1.4;
+    margin-bottom: 10px;
+  }
+  .gear-intro a {
+    color: var(--accent-dark);
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-color: var(--line);
+    text-underline-offset: 2px;
+  }
+  .gear-intro a:hover { text-decoration-color: currentColor; }
+  .gear-image {
+    display: block;
+    max-width: 100%;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    cursor: zoom-in;
+  }
+
   #trail-notes {
     flex-shrink: 0;
     background: var(--surface);
@@ -417,6 +453,9 @@
     .energy-intro { font-size: 0.7rem; }
     #energy-body { gap: 7px; }
     #energy-body .itin-day { flex-basis: 100%; padding: 6px 8px; }
+    #gear-card { padding: 10px 12px; }
+    #gear-card h2 { font-size: 0.95rem; }
+    .gear-intro { font-size: 0.8rem; }
     #trail-notes { padding: 10px 12px; }
     #trail-notes h2 { font-size: 0.95rem; }
     .notes-grid { gap: 7px; }
@@ -534,6 +573,13 @@
         <div class="itin-stats">You'll burn roughly 1,340 to 1,390 calories hiking, about 3,150 to 3,200 calories total for the day. Carry about 5 to 5.5 liters leaving Serpent Lake &mdash; the stretch to Indian Lake is 9.1 dry miles, roughly 5.2 hours, so top off there before the final 1.7 miles.</div>
       </div>
     </div>
+  </div>
+  <div id="gear-card">
+    <h2>Gear</h2>
+    <div class="gear-intro">See below for recommended gear lists from Pam Neely's Santa Fe to Taos Trail (SF2T) guide, and click <a href="https://www.packlightapp.com/packinglist?listId=4309E479-00AE-4602-ABEA-5374F2E01B4A" target="_blank" rel="noopener">here</a> for a complete example packing list for this particular trip. That example doesn't include food and water, but does include a pretty heavy camera, hence the higher base weight.</div>
+    <a href="SF2T_Gear_Checklist.png">
+      <img src="SF2T_Gear_Checklist.png" alt="Recommended gear checklist for a day hike and one- or two-night overnight, from Pam Neely's Santa Fe to Taos Trail guide" class="gear-image">
+    </a>
   </div>
   <div id="trail-notes">
     <h2>Trail Notes</h2>
