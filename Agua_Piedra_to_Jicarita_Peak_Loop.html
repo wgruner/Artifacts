@@ -275,7 +275,7 @@
   .panel-collapsed .panel-body { display: none; }
   .panel-collapsed { padding-bottom: 2px; }
 
-  .reset-zoom-btn {
+  .reset-zoom-btn, .download-gpx-btn {
     background-color: #fff;
     width: 26px; height: 26px;
     display: flex;
@@ -286,8 +286,8 @@
     color: black;
     text-decoration: none;
   }
-  .reset-zoom-btn:hover { background-color: #f4f4f4; }
-  .reset-zoom-btn svg { transform: translateY(3px); }
+  .reset-zoom-btn:hover, .download-gpx-btn:hover { background-color: #f4f4f4; }
+  .reset-zoom-btn svg, .download-gpx-btn svg { transform: translateY(3px); }
   .leaflet-bar { border-radius: 8px !important; overflow: hidden; }
   .leaflet-bar a { border-radius: 0 !important; }
 
@@ -717,6 +717,23 @@ const ResetZoomControl = L.Control.extend({
 });
 map.addControl(new ResetZoomControl());
 
+const DownloadGpxControl = L.Control.extend({
+  options: { position: 'topleft' },
+  onAdd: function() {
+    const container = L.DomUtil.create('div', 'leaflet-bar');
+    const btn = L.DomUtil.create('a', 'download-gpx-btn', container);
+    btn.href = '#';
+    btn.title = 'Download GPX';
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><polyline points="6 11 12 17 18 11"/><path d="M4 21h16"/></svg>';
+    L.DomEvent.on(btn, 'click', function(e) {
+      L.DomEvent.stop(e);
+      downloadGpx();
+    });
+    return container;
+  }
+});
+map.addControl(new DownloadGpxControl());
+
 // ---------- Require Ctrl/Cmd + scroll to zoom the map ----------
 // Leaflet's default scroll-wheel zoom hijacks ordinary page scrolling the
 // moment the cursor crosses the map, since it calls preventDefault on every
@@ -1101,6 +1118,9 @@ const poiData = [{"lat": 36.121339, "lon": -105.529513, "name": "Water - Agua Pi
 const plannedCamps = ['los esteros', 'serpent lake'];
 
 const poiLayers = { campOurs: L.layerGroup(), camp: L.layerGroup(), water: L.layerGroup(), parking: L.layerGroup(), note: L.layerGroup(), waterLive: L.layerGroup() };
+// Populated (and reset) by loadOverpassWater() below — kept alongside the markers so the
+// GPX export can include live water features even though they're fetched asynchronously.
+let liveWaterPoints = [];
 
 function poiIcon(cat, highlight) {
   const cls = highlight ? 'poi-camp poi-camp-highlight' : 'poi-' + cat;
@@ -1252,6 +1272,7 @@ async function loadOverpassWater() {
   const data = await res.json();
 
   poiLayers.waterLive.clearLayers();
+  liveWaterPoints = [];
   let count = 0;
 
   // Ponds / springs / drinking water / wells within the mile radius.
@@ -1270,6 +1291,7 @@ async function loadOverpassWater() {
     const marker = L.marker([lat, lon], { icon: poiIcon('water') });
     marker.bindPopup(`<b>${label}</b><br><i>${mileTxt}</i><br>OSM ${el.type} ${el.id}${tagLines ? '<br>' + tagLines : ''}<br><a href="${osmUrl}" target="_blank" rel="noopener">View on OpenStreetMap</a>`);
     marker.addTo(poiLayers.waterLive);
+    liveWaterPoints.push({ lat, lon, name: label, desc: `${mileTxt} (OSM ${el.type} ${el.id})` });
     count++;
   });
 
@@ -1296,6 +1318,7 @@ async function loadOverpassWater() {
     const marker = L.marker([c.lat, c.lon], { icon: poiIcon('water') });
     marker.bindPopup(`<b>${label}</b><br><i>${mileTxt}</i><br>waterway = ${c.waterway}<br><a href="${osmUrl}" target="_blank" rel="noopener">View on OpenStreetMap</a>`);
     marker.addTo(poiLayers.waterLive);
+    liveWaterPoints.push({ lat: c.lat, lon: c.lon, name: label, desc: `${mileTxt} (waterway = ${c.waterway})` });
     count++;
   });
 
@@ -1316,6 +1339,64 @@ function runOverpassWater() {
 
 poiLayers.waterLive.addTo(map);
 runOverpassWater();
+
+// ---------- GPX export (everything currently known about the route: curated POIs,
+// whatever live water has loaded so far, the start/peak landmarks, and the track) ----------
+function escapeXml(str) {
+  return String(str).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[ch]));
+}
+
+const POI_CAT_TO_GPX_TYPE = { camp: 'Campsite', water: 'Water', note: 'Note', parking: 'Parking' };
+
+function gpxWpt(lat, lon, name, desc, type) {
+  return `  <wpt lat="${lat}" lon="${lon}">
+    <name>${escapeXml(name)}</name>
+    <desc>${escapeXml(desc)}</desc>
+    <type>${escapeXml(type)}</type>
+  </wpt>`;
+}
+
+function buildGpx() {
+  const wpts = [];
+
+  poiData.forEach(p => {
+    const mileTxt = p.mile ? `mile ${p.mile.replace(/\.$/, '')}` : '';
+    const desc = [mileTxt, p.desc].filter(Boolean).join(' — ');
+    wpts.push(gpxWpt(p.lat, p.lon, p.name, desc, POI_CAT_TO_GPX_TYPE[p.cat] || 'Note'));
+  });
+
+  liveWaterPoints.forEach(p => {
+    wpts.push(gpxWpt(p.lat, p.lon, p.name, p.desc, 'Water'));
+  });
+
+  wpts.push(gpxWpt(start[0], start[1], 'Start', `${Math.round(start[2] * 3.28084).toLocaleString()} ft`, 'Landmark'));
+  wpts.push(gpxWpt(peak[0], peak[1], 'Jicarita Peak (high point)', `${Math.round(peak[2] * 3.28084).toLocaleString()} ft, ${(cumDist[peakIdx] / 1609.34).toFixed(1)} mi in`, 'Landmark'));
+
+  const trkpts = track.map(([lat, lon, ele]) => `      <trkpt lat="${lat}" lon="${lon}"><ele>${ele}</ele></trkpt>`).join('\n');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Agua Piedra to Jicarita Peak Loop" xmlns="http://www.topografix.com/GPX/1/1">
+${wpts.join('\n')}
+  <trk>
+    <name>Agua Piedra to Jicarita Peak Loop</name>
+    <trkseg>
+${trkpts}
+    </trkseg>
+  </trk>
+</gpx>`;
+}
+
+function downloadGpx() {
+  const blob = new Blob([buildGpx()], { type: 'application/gpx+xml' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'Agua_Piedra_to_Jicarita_Peak_Loop.gpx';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 // hover marker synced with elevation/temperature profile
 const hoverMarker = L.marker([start[0], start[1]], { icon: dotIcon('hover-dot'), interactive: false, opacity: 0 }).addTo(map);
