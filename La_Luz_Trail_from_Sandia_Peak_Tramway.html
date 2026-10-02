@@ -1,0 +1,1331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>La Luz Trail from Sandia Peak Tramway &ndash; Oct 9, 2026</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="format-detection" content="telephone=no, date=no, address=no, email=no, url=no">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<style>
+  :root {
+    --ink: #33312c;
+    --paper: #faf8f3;
+    --surface: #ffffff;
+    --accent: #34495e;
+    --accent-dark: #263544;
+    --accent-soft: #e6eaed;
+    --line: #e8e2d5;
+    --muted: #918b7c;
+    --radius: 14px;
+    --radius-sm: 9px;
+    --shadow: 0 2px 10px rgba(60, 50, 30, 0.08), 0 1px 2px rgba(60, 50, 30, 0.06);
+  }
+  * { box-sizing: border-box; }
+  html {
+    margin: 0;
+    background: var(--paper);
+  }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+  }
+  #app {
+    display: flex;
+    flex-direction: column;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 10px;
+    gap: 10px;
+  }
+  #content-row {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .map-wrap {
+    flex: none;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+  }
+  .map-header {
+    flex-shrink: 0;
+    padding: 12px 16px 6px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--accent-dark);
+    touch-action: pan-y;
+  }
+  .map-body {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+  }
+  /* Leaflet's attribution control gets moved here from its default corner
+     overlay (see JS below), so its long text never sits on top of the map. */
+  .map-footer {
+    flex-shrink: 0;
+    padding: 6px 16px 10px;
+    font-size: 0.72rem;
+    color: var(--muted);
+    border-top: 1px solid var(--line);
+  }
+  .map-footer a { color: var(--muted); }
+  .map-footer .leaflet-control-attribution {
+    background: none;
+    box-shadow: none;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    color: inherit;
+  }
+  #scroll-zoom-hint {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 900;
+    background: rgba(33,30,25,0.78);
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 10px 18px;
+    border-radius: 999px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+    white-space: nowrap;
+  }
+  #scroll-zoom-hint.visible { opacity: 1; }
+  #map {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    width: 100%;
+    height: 100%;
+  }
+  .leaflet-container { background: #eee9dc; font-family: inherit; }
+
+  /* Bottom reserve. A real in-flow element rather than padding on #app —
+     iOS Safari is far more reliable about counting an element toward the
+     document's scrollable height than trailing padding on a flex container.
+     The touch-device floor below is the real guarantee; the JS-measured
+     --chrome-inset only ever adds to it. */
+  #scroll-spacer {
+    flex-shrink: 0;
+    height: calc(var(--chrome-inset, 0px) + env(safe-area-inset-bottom, 0px) + 32px);
+    min-height: 32px;
+  }
+  @media (hover: none) and (pointer: coarse) {
+    #scroll-spacer { min-height: 180px; }
+  }
+  #profile-wrap {
+    height: 440px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    touch-action: pan-y;
+    overflow: hidden;
+  }
+  .profile-section {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+  }
+  .profile-divider {
+    height: 1px;
+    background: var(--line);
+    flex-shrink: 0;
+  }
+  .profile-section canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+    touch-action: pan-y;
+  }
+  #profile-header {
+    flex-shrink: 0;
+    padding: 12px 16px 6px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--accent-dark);
+    touch-action: pan-y;
+  }
+  #profile-footer {
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--ink);
+    border-top: 1px solid var(--line);
+    padding: 0 14px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .marker-label {
+    background: var(--accent);
+    color: white;
+    border-radius: 50%;
+    width: 14px; height: 14px;
+    border: 2px solid white;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+  }
+  .hover-dot {
+    background: var(--accent-dark);
+    border-radius: 50%;
+    width: 10px; height: 10px;
+    border: 2px solid white;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+  }
+
+  .leaflet-popup-content-wrapper {
+    background: var(--surface);
+    color: var(--ink);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+  }
+  .leaflet-popup-content { font-size: 0.85rem; margin: 10px 13px; line-height: 1.4; }
+  .leaflet-popup-tip { background: var(--surface); border: 1px solid var(--line); }
+
+  .reset-zoom-btn, .download-gpx-btn {
+    background-color: #fff;
+    width: 26px; height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    cursor: pointer;
+    color: black;
+    text-decoration: none;
+  }
+  .reset-zoom-btn:hover, .download-gpx-btn:hover { background-color: #f4f4f4; }
+  .reset-zoom-btn svg, .download-gpx-btn svg { transform: translateY(3px); }
+  .leaflet-bar { border-radius: 8px !important; overflow: hidden; }
+  .leaflet-bar a { border-radius: 0 !important; }
+
+  #energy-card {
+    flex-shrink: 0;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 12px 16px;
+  }
+  #energy-card h2 {
+    margin: 0 0 8px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--accent-dark);
+  }
+  .energy-intro {
+    font-size: 0.76rem;
+    color: var(--muted);
+    line-height: 1.4;
+    margin-bottom: 10px;
+  }
+  #energy-body {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  #energy-body .itin-day { flex: 1 1 220px; }
+
+  #gear-card {
+    flex-shrink: 0;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 12px 16px;
+  }
+  #gear-card h2 {
+    margin: 0 0 8px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--accent-dark);
+  }
+  .gear-intro {
+    font-size: 0.85rem;
+    color: var(--muted);
+    line-height: 1.4;
+    margin-bottom: 10px;
+  }
+  .gear-image {
+    display: block;
+    max-width: 100%;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    cursor: zoom-in;
+  }
+
+  #trail-notes {
+    flex-shrink: 0;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 12px 16px;
+  }
+  #trail-notes h2 {
+    margin: 0 0 10px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--accent-dark);
+  }
+  .notes-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .note-item {
+    flex: 1 1 220px;
+    padding: 8px 11px;
+    border-radius: var(--radius-sm);
+    background: rgba(224,180,0,0.16);
+    border-left: 3px solid #e0b400;
+  }
+  .note-label {
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 3px;
+  }
+  .note-text {
+    color: var(--muted);
+    font-size: 0.8rem;
+    line-height: 1.4;
+  }
+  .note-text a, .energy-intro a {
+    color: var(--accent-dark);
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-color: var(--line);
+    text-underline-offset: 2px;
+  }
+  .note-text a:hover, .energy-intro a:hover {
+    text-decoration-color: currentColor;
+  }
+
+  #itin-panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    font-size: 0.85rem;
+    box-shadow: var(--shadow);
+    flex-shrink: 0;
+  }
+  #itin-panel h2 {
+    margin: 0 0 10px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--accent-dark);
+  }
+  #itin-panel h2 a {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: rgba(0,0,0,0.25);
+    text-underline-offset: 2px;
+  }
+  #itin-panel h2 a:hover,
+  #itin-panel h2 a:focus-visible {
+    text-decoration-color: currentColor;
+  }
+  #itin-panel h2 .date-range {
+    font-weight: 600;
+    color: var(--muted);
+  }
+  #itin-body {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .itin-day {
+    flex: 1 1 200px;
+    padding: 8px 11px;
+    border-radius: var(--radius-sm);
+    background: var(--paper);
+    border-left: 3px solid var(--line);
+  }
+  .itin-day .itin-label { font-weight: 700; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .itin-day .itin-temp { font-weight: 600; color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
+  .itin-day .itin-stats { color: var(--muted); font-size: 0.8rem; }
+  .itin-up { background: rgba(239,118,122,0.16); border-left-color: #ef767a; }
+  .itin-down { background: rgba(69,105,144,0.14); border-left-color: #456990; }
+  .itin-totals {
+    background: rgba(224,180,0,0.16);
+    border-left-color: #e0b400;
+  }
+
+  @media (max-width: 680px) {
+    #app { padding: 8px; gap: 8px; }
+    #energy-card { padding: 10px 12px; }
+    .energy-intro { font-size: 0.7rem; }
+    #energy-body { gap: 7px; }
+    #energy-body .itin-day { flex-basis: 100%; padding: 6px 8px; }
+    #gear-card { padding: 10px 12px; }
+    .gear-intro { font-size: 0.8rem; }
+    #trail-notes { padding: 10px 12px; }
+    .notes-grid { gap: 7px; }
+    .note-item { flex-basis: 100%; padding: 6px 8px; }
+    .note-text { font-size: 0.76rem; }
+    #profile-wrap { height: 370px; }
+    #itin-panel { padding: 10px 12px; font-size: 0.82rem; }
+    .map-header, #profile-header { padding: 10px 12px 6px; }
+    #itin-body { gap: 7px; }
+    .itin-day { flex-basis: 100%; padding: 6px 8px; }
+    .itin-day .itin-stats { font-size: 0.78rem; }
+    #profile-footer { font-size: 0.66rem; }
+  }
+
+  /* Landscape tablets and desktop: map and graph sit side by side, each
+     taking half the available width, stretched to the same row height. */
+  @media (min-width: 681px) and (orientation: landscape) {
+    #app {
+      max-width: 1500px;
+    }
+    #content-row {
+      flex-direction: row-reverse;
+      align-items: stretch;
+      height: min(70vh, 620px);
+      height: min(70svh, 620px);
+      min-height: 260px;
+    }
+    .map-wrap {
+      flex: 1 1 0;
+      width: auto;
+      min-width: 0;
+    }
+    .map-body {
+      flex: 1;
+      aspect-ratio: auto;
+      min-height: 0;
+    }
+    #profile-wrap {
+      flex: 1 1 0;
+      height: auto;
+      min-width: 0;
+    }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="itin-panel">
+    <h2><a href="https://www.alltrails.com/explore/custom-routes/la-luz-trail-from-sandia-peak-tramway-parking-66f83fb?u=i&amp;sh=se65qt" target="_blank" rel="noopener">La Luz Trail from Sandia Peak Tramway</a> <span class="date-range">&ndash; Oct 9, 2026</span></h2>
+    <div id="itin-body"></div>
+  </div>
+  <div id="content-row">
+    <div class="map-wrap">
+      <div class="map-header">Trail Map</div>
+      <div class="map-body">
+        <div id="map"></div>
+        <div id="scroll-zoom-hint">Use ⌘ + scroll to zoom the map</div>
+      </div>
+      <div class="map-footer" id="map-footer"></div>
+    </div>
+    <div id="profile-wrap">
+      <div id="profile-header">Elevation, Temperature &amp; Precipitation</div>
+      <div class="profile-section" id="elev-section">
+        <canvas id="elev-canvas"></canvas>
+      </div>
+      <div class="profile-divider"></div>
+      <div class="profile-section" id="temp-section">
+        <canvas id="temp-canvas"></canvas>
+      </div>
+      <div class="profile-divider"></div>
+      <div class="profile-section" id="precip-section">
+        <canvas id="precip-canvas"></canvas>
+      </div>
+      <div id="profile-footer"></div>
+    </div>
+  </div>
+  <div id="energy-card">
+    <h2>Energy &amp; Hydration</h2>
+    <div class="energy-intro">Estimated for a 170&nbsp;lb reference hiker with a ~15&nbsp;lb day pack, using the <a href="https://en.wikipedia.org/wiki/Pandolf_equation" target="_blank" rel="noopener">Pandolf load-carriage equation</a> applied to this route's actual grade (descents counted as level walking, since Pandolf alone overstates how much downhill saves on rough trail), and a <a href="https://www.rei.com/learn/expert-advice/hydrate.html" target="_blank" rel="noopener">wilderness-medicine&ndash;style hydration baseline</a> (0.5 L/hr moderate pace, +25% on sustained steep climbs, +0.1 L/hr above 8,000&nbsp;ft and again in temperatures above 70&deg;F). Heavier or lighter hikers should scale up or down accordingly.</div>
+    <div id="energy-body"></div>
+  </div>
+  <div id="gear-card">
+    <h2>Gear</h2>
+    <div class="gear-intro">The Day Hike column of the checklist below (from Pam Neely's Santa Fe to Taos Trail guide) covers this one well. For La Luz specifically, add trekking poles for the long rocky descent, a warm layer and windbreaker for the top (it's typically 15&ndash;20&deg;F colder up there than at the car), sun protection for the exposed lower half, and a headlamp in case the descent runs late.</div>
+    <a href="SF2T_Gear_Checklist.png">
+      <img src="SF2T_Gear_Checklist.png" alt="Recommended gear checklist for a day hike and one- or two-night overnight, from Pam Neely's Santa Fe to Taos Trail guide" class="gear-image">
+    </a>
+  </div>
+  <div id="trail-notes">
+    <h2>Trail Notes</h2>
+    <div class="notes-grid">
+      <div class="note-item">
+        <div class="note-label">About the forecast</div>
+        <div class="note-text" id="forecast-note-text">Until the live forecast loads, temperatures on this page are a rough seasonal estimate for early October: about 44&ndash;68&deg;F at the trailhead (~6,500 ft) and 34&ndash;52&deg;F near the crest (~10,600 ft), interpolated by elevation and by time of day along the hike. <em>(Loading a live forecast now&hellip;)</em></div>
+      </div>
+      <div class="note-item">
+        <div class="note-label">Riding the tram down instead</div>
+        <div class="note-text">The route ends at the tram's upper terminal, so you can skip the descent and ride down to your car instead &mdash; it cuts the day roughly in half and spares your knees the steep, rocky descent. One-way tickets are sold (about $24 at last check), but buy ahead online: Oct 9 falls during the <a href="https://balloonfiesta.com/" target="_blank" rel="noopener">Balloon Fiesta</a> (Oct 3&ndash;11, 2026), when the tram is at its busiest and can sell out. The tram is closed Tuesdays (Oct 9 is a Friday) and runs weather permitting &mdash; high winds can shut it down, so have a plan to hike down anyway. Confirm hours and tickets at <a href="https://sandiapeak.com/aerial-tram-tickets/" target="_blank" rel="noopener">sandiapeak.com</a>.</div>
+      </div>
+      <div class="note-item">
+        <div class="note-label">Water &amp; sun</div>
+        <div class="note-text">There's no reliable water anywhere on La Luz &mdash; carry everything you'll need from the start (see Energy &amp; Hydration above). The lower half climbs through open, south- and west-facing desert scrub with very little shade, which is the main reason for an early start: by early afternoon the lower switchbacks can be far warmer than the forecast at the top suggests. The upper terminal and the restaurant at the top are possible places to buy a drink, but don't count on them.</div>
+      </div>
+      <div class="note-item">
+        <div class="note-label">Terrain &amp; pace</div>
+        <div class="note-text">La Luz is well-marked and easy to follow, but long stretches are loose decomposed granite and, higher up, rocky talus slopes with uneven footing. That makes the descent slower than the simple pace model on this page assumes &mdash; budget extra time coming down, and use poles. Stay on the switchbacks rather than cutting corners. The last stretch follows the crest south from the top of La Luz to the tram terminal, mostly gently rolling at 10,300&ndash;10,600 ft.</div>
+      </div>
+      <div class="note-item">
+        <div class="note-label">Cold, wind &amp; altitude at the top</div>
+        <div class="note-text">The route gains roughly 4,000 ft from the parking lot to the high point (~10,650 ft) near the top of La Luz. Expect the crest to be noticeably colder and windier than the trailhead, and October can bring the first snow or ice to the shaded upper switchbacks &mdash; if a storm passes through in the days before, check recent AllTrails reviews for conditions. Altitude can also make the upper climb feel harder than the numbers suggest, especially for anyone coming from low elevation.</div>
+      </div>
+      <div class="note-item">
+        <div class="note-label">Daylight</div>
+        <div class="note-text" id="daylight-note-text">On Oct 9, sunrise is around 7:07 AM and sunset around 6:38 PM in Albuquerque. The plan above starts at first light and finishes with a comfortable buffer, but if the day runs long the descent is the worst place to lose the light &mdash; bring a headlamp.</div>
+      </div>
+      <div class="note-item">
+        <div class="note-label">Wildlife</div>
+        <div class="note-text">Rattlesnakes are possible on the warm, rocky lower trail, even in early October on a sunny day &mdash; watch where you put your hands and feet. Black bears live in the Sandias too; don't leave food unattended at the top.</div>
+      </div>
+      <div class="note-item">
+        <div class="note-label">Trail status &amp; closures</div>
+        <div class="note-text">La Luz is in the Sandia Mountain Wilderness, managed by the Sandia Ranger District of Cibola National Forest. Check <a href="https://www.fs.usda.gov/cibola/alerts" target="_blank" rel="noopener">Cibola NF alerts</a> before heading out for any fire restrictions, closures, or trail damage, and check <a href="https://sandiapeak.com/" target="_blank" rel="noopener">sandiapeak.com</a> for the tram's status the morning of.</div>
+      </div>
+    </div>
+  </div>
+  <div id="scroll-spacer"></div>
+</div>
+
+<script>
+// Ascent from the Sandia Peak Tramway parking lot up to the tram's upper
+// terminal, decoded from the AllTrails custom route (polyline + per-point
+// elevation, meters) on Oct 2, 2026. The AllTrails route is an exact
+// out-and-back, so the return leg is just this array reversed.
+const ascent = [[35.19184,-106.47926,1986.4],[35.19193,-106.47921,1987],[35.19202,-106.47925,1986],[35.1921,-106.47922,1989],[35.19222,-106.47914,1991.7],[35.1924,-106.47912,1993.3],[35.19261,-106.47906,1993.1],[35.19293,-106.47909,1993.9],[35.19304,-106.47912,1994.2],[35.19323,-106.47915,1992.1],[35.19327,-106.47917,1993.2],[35.1933,-106.47919,1993.2],[35.19338,-106.47914,1994.9],[35.19349,-106.47916,1996.2],[35.19353,-106.47915,1997.2],[35.19364,-106.47906,1999.1],[35.19372,-106.47904,2000.1],[35.19373,-106.47905,2000.1],[35.19377,-106.47905,2000.9],[35.1941,-106.47907,2002.3],[35.19422,-106.47904,2002.2],[35.19427,-106.47904,2001.1],[35.19433,-106.47903,2000.6],[35.19438,-106.47901,2000.7],[35.19444,-106.479,2000.7],[35.19446,-106.479,2000.7],[35.19451,-106.47905,2001.1],[35.19455,-106.4791,2000.1],[35.19461,-106.47915,1999.6],[35.19466,-106.47918,2000],[35.19471,-106.47917,2000],[35.19475,-106.47919,2000.7],[35.19479,-106.47918,2001.2],[35.19486,-106.47922,2001.3],[35.19492,-106.47923,2001.3],[35.19497,-106.47922,2001.4],[35.195,-106.4792,2001.6],[35.19505,-106.47922,2001.6],[35.19519,-106.47921,2002.6],[35.19528,-106.47922,2004],[35.19535,-106.47925,2003.7],[35.19536,-106.47926,2003.7],[35.1954,-106.47928,2003.7],[35.19542,-106.47928,2004.6],[35.19548,-106.47924,2004.6],[35.19551,-106.47922,2006.6],[35.19559,-106.47928,2006.3],[35.19562,-106.47929,2006.3],[35.19564,-106.47932,2007.4],[35.1957,-106.47934,2007.7],[35.19575,-106.47937,2007.7],[35.1958,-106.47936,2008.5],[35.19586,-106.47932,2009.9],[35.1959,-106.47933,2009.1],[35.19593,-106.47935,2009.8],[35.196,-106.4795,2011],[35.19606,-106.47956,2012.7],[35.19606,-106.47964,2012.9],[35.19606,-106.47965,2012.9],[35.1961,-106.47971,2013.3],[35.19619,-106.47979,2015.5],[35.1962,-106.47987,2014.4],[35.19625,-106.47993,2013.7],[35.19627,-106.47996,2015.8],[35.1963,-106.47999,2015.8],[35.19633,-106.48004,2016.7],[35.19634,-106.48005,2016.7],[35.19639,-106.48007,2016.7],[35.19641,-106.4801,2017.9],[35.19641,-106.48014,2017.9],[35.19643,-106.48016,2017.9],[35.19644,-106.48023,2018.4],[35.19644,-106.48027,2019.4],[35.1964,-106.48049,2020.3],[35.19642,-106.4806,2019.8],[35.19645,-106.48062,2018.6],[35.19648,-106.48066,2018.8],[35.19659,-106.48072,2017.8],[35.19664,-106.48071,2018.6],[35.19665,-106.48072,2018.6],[35.1967,-106.48079,2017.7],[35.19673,-106.4808,2017.7],[35.19679,-106.48079,2017.4],[35.19682,-106.48081,2017.2],[35.19685,-106.48085,2017.2],[35.19688,-106.48086,2017.2],[35.19698,-106.48085,2017.6],[35.19703,-106.48082,2016.9],[35.19704,-106.48079,2016.9],[35.19707,-106.48073,2018.6],[35.19711,-106.48072,2017.6],[35.19715,-106.48068,2019.1],[35.19723,-106.48068,2018.8],[35.19727,-106.48071,2017.3],[35.1973,-106.48075,2017.3],[35.19738,-106.48088,2017.6],[35.19739,-106.48094,2017.6],[35.19743,-106.48099,2017.4],[35.19742,-106.48102,2017.4],[35.19742,-106.48105,2016.6],[35.1974,-106.48109,2016.6],[35.19742,-106.48112,2016.6],[35.19736,-106.48122,2013.2],[35.19736,-106.48126,2013.2],[35.19738,-106.48128,2013.8],[35.19741,-106.48129,2013.8],[35.19745,-106.48133,2012.6],[35.19748,-106.48133,2012.6],[35.19753,-106.48137,2012],[35.19755,-106.48137,2012],[35.19763,-106.48129,2012.5],[35.19767,-106.48128,2011],[35.19769,-106.48127,2011],[35.19771,-106.48127,2011],[35.19776,-106.48132,2009.7],[35.19782,-106.48141,2009.1],[35.19782,-106.48145,2009.1],[35.1978,-106.48157,2008.1],[35.1978,-106.48159,2008.1],[35.19781,-106.48161,2008.1],[35.19784,-106.48162,2008.1],[35.1979,-106.48164,2006.7],[35.19798,-106.48169,2006],[35.198,-106.48169,2006],[35.19806,-106.48166,2004.7],[35.19812,-106.48168,2002.7],[35.19818,-106.48172,2000.3],[35.19821,-106.48181,2000.4],[35.19826,-106.48199,1998.3],[35.19838,-106.48214,1995],[35.1984,-106.48218,1994.7],[35.1984,-106.48226,1994.1],[35.19847,-106.48239,1992.6],[35.1986,-106.48252,1990.1],[35.19866,-106.48254,1989.2],[35.19868,-106.48256,1989.2],[35.1987,-106.48263,1988.8],[35.19875,-106.48268,1987.4],[35.19879,-106.48275,1986.5],[35.1988,-106.48282,1985.7],[35.19887,-106.48293,1983.2],[35.19891,-106.48303,1982.8],[35.19893,-106.48314,1981.3],[35.19895,-106.48328,1980.4],[35.19898,-106.48332,1980.4],[35.19899,-106.48336,1979.8],[35.19901,-106.48351,1978.5],[35.199,-106.48364,1977],[35.19901,-106.48372,1976.1],[35.19904,-106.48382,1975.1],[35.19915,-106.48371,1974.4],[35.19923,-106.48346,1973.3],[35.19923,-106.48343,1973.3],[35.19922,-106.48333,1972.9],[35.19926,-106.4832,1972.8],[35.19926,-106.48313,1972.8],[35.19927,-106.48308,1973.1],[35.1993,-106.48304,1971.8],[35.19936,-106.48297,1971.5],[35.19938,-106.48293,1971.5],[35.19942,-106.4827,1971.5],[35.19944,-106.48265,1972.6],[35.19951,-106.48259,1972.9],[35.19963,-106.48254,1974.4],[35.19971,-106.48244,1976.2],[35.19981,-106.48242,1976.6],[35.19985,-106.4824,1979],[35.19987,-106.4824,1979],[35.19992,-106.48243,1977.4],[35.19998,-106.48243,1977.4],[35.20003,-106.48244,1977.4],[35.2001,-106.48244,1977.2],[35.20043,-106.48232,1981.6],[35.20052,-106.48232,1980.7],[35.2006,-106.4823,1979.6],[35.20067,-106.48226,1978.6],[35.20071,-106.48226,1978.4],[35.20079,-106.48231,1979.6],[35.20096,-106.48239,1982.9],[35.20102,-106.48239,1982.9],[35.20108,-106.48241,1984.1],[35.20112,-106.48244,1984.2],[35.20116,-106.48248,1984.2],[35.20118,-106.48249,1985.4],[35.20124,-106.48247,1986.4],[35.20131,-106.4825,1985.9],[35.20133,-106.48252,1985.9],[35.20139,-106.48252,1985.7],[35.20144,-106.48251,1985.7],[35.20156,-106.48242,1985.1],[35.20159,-106.48242,1984.9],[35.20162,-106.48242,1984.9],[35.20165,-106.48246,1984.9],[35.2017,-106.48253,1984.9],[35.20174,-106.48255,1986],[35.20182,-106.48256,1987.1],[35.20187,-106.48255,1988.1],[35.20191,-106.48253,1988.1],[35.20208,-106.48242,1992.3],[35.20212,-106.48241,1993.8],[35.2022,-106.48241,1994.4],[35.20225,-106.48243,1993.9],[35.2024,-106.48243,1996.1],[35.20253,-106.48241,1999.5],[35.20266,-106.48234,1999.9],[35.20269,-106.48237,1999.9],[35.20275,-106.4824,2001.1],[35.20285,-106.48242,2003.1],[35.2029,-106.48244,2003.1],[35.2029,-106.48246,2003.1],[35.2029,-106.48248,2003.1],[35.20286,-106.48252,2003.7],[35.20285,-106.48257,2003.7],[35.20284,-106.48263,2001.2],[35.20284,-106.48267,2000.3],[35.20287,-106.48271,2002.2],[35.2029,-106.48272,2002.2],[35.20298,-106.48273,2003.5],[35.2031,-106.48271,2004.1],[35.20317,-106.48268,2004],[35.20319,-106.48266,2006.9],[35.20328,-106.48263,2007],[35.2033,-106.48261,2007],[35.20336,-106.48254,2009.3],[35.20342,-106.48252,2009.2],[35.2035,-106.48245,2010.9],[35.20356,-106.48238,2012.9],[35.20363,-106.48233,2013],[35.20374,-106.48229,2015.5],[35.20385,-106.48221,2018.3],[35.20387,-106.48221,2018.3],[35.20389,-106.48221,2018.3],[35.20391,-106.48223,2019.5],[35.20391,-106.48229,2018.6],[35.20393,-106.48233,2017.8],[35.20398,-106.4824,2020.1],[35.20399,-106.48244,2020.7],[35.20399,-106.48253,2021.7],[35.20399,-106.48257,2021.7],[35.20397,-106.48262,2019],[35.20397,-106.48264,2019],[35.20401,-106.48278,2023.2],[35.204,-106.48287,2025],[35.20398,-106.4829,2025],[35.20393,-106.48298,2024.7],[35.20388,-106.48309,2024.4],[35.20388,-106.48322,2026.4],[35.2039,-106.48328,2026],[35.20393,-106.48332,2026.6],[35.20399,-106.48332,2027.2],[35.20404,-106.48335,2027.2],[35.2041,-106.48336,2027],[35.20414,-106.48342,2028.1],[35.20415,-106.48343,2028.1],[35.2042,-106.48345,2028.1],[35.20425,-106.48345,2028.1],[35.20435,-106.4834,2030.3],[35.20453,-106.48341,2031.8],[35.20456,-106.48339,2032.3],[35.20461,-106.48335,2034.2],[35.20463,-106.48334,2034.2],[35.20469,-106.48336,2033.7],[35.20474,-106.48335,2034.9],[35.20483,-106.48336,2035.4],[35.20488,-106.48338,2035.4],[35.20492,-106.48336,2036.4],[35.20496,-106.48337,2037.7],[35.20501,-106.4834,2037.7],[35.20502,-106.48342,2037.7],[35.20501,-106.48349,2037.3],[35.20503,-106.48354,2038],[35.20516,-106.48363,2038.3],[35.20524,-106.48366,2041],[35.20535,-106.48363,2041.8],[35.20539,-106.48359,2042.7],[35.20544,-106.48358,2042.7],[35.20554,-106.48352,2043.5],[35.20559,-106.48344,2044.1],[35.2057,-106.48332,2044.8],[35.20572,-106.48328,2044.8],[35.20573,-106.48324,2045.2],[35.20577,-106.48317,2045.9],[35.20578,-106.48308,2046.6],[35.20585,-106.4829,2046.9],[35.20592,-106.48256,2051],[35.20595,-106.4825,2049.5],[35.20602,-106.48244,2050.9],[35.20603,-106.4824,2053],[35.20607,-106.48232,2055],[35.20617,-106.48221,2055.2],[35.20618,-106.48217,2055.2],[35.2062,-106.48216,2055.2],[35.20624,-106.4821,2055.3],[35.20627,-106.48201,2056.9],[35.20626,-106.48191,2058.1],[35.20626,-106.48185,2058.8],[35.20631,-106.48171,2059.1],[35.20633,-106.48169,2059.1],[35.20634,-106.48169,2059.1],[35.20642,-106.48179,2059.1],[35.20645,-106.48181,2059],[35.20648,-106.48185,2059],[35.20652,-106.48189,2060.9],[35.20655,-106.4819,2058.3],[35.20659,-106.48189,2062],[35.20664,-106.48183,2063.1],[35.20663,-106.48169,2064.8],[35.20668,-106.4816,2065.8],[35.20669,-106.48159,2065.8],[35.20673,-106.48158,2066.3],[35.20682,-106.48154,2069.1],[35.20688,-106.48153,2069.6],[35.20695,-106.48149,2069.1],[35.20697,-106.48147,2069.1],[35.20698,-106.48144,2071.4],[35.20697,-106.4814,2071.4],[35.20698,-106.48134,2073.4],[35.20696,-106.48129,2075.3],[35.20697,-106.48126,2075.3],[35.20702,-106.48121,2073.8],[35.20703,-106.48117,2076],[35.20705,-106.48114,2076],[35.2072,-106.48101,2080.1],[35.20729,-106.48098,2079.5],[35.20734,-106.48095,2083.8],[35.20739,-106.48094,2083.8],[35.20742,-106.4809,2083],[35.20749,-106.48085,2086.8],[35.20762,-106.48085,2086.7],[35.20771,-106.48078,2086.3],[35.20775,-106.48076,2090.7],[35.2078,-106.48073,2090.7],[35.20783,-106.48072,2091.1],[35.20797,-106.48071,2093],[35.20808,-106.48072,2094.3],[35.20826,-106.48076,2097.8],[35.20833,-106.48076,2098.2],[35.20844,-106.48074,2098.6],[35.2085,-106.48072,2099],[35.20861,-106.48073,2100.1],[35.20879,-106.48069,2104.7],[35.20883,-106.48066,2103.4],[35.20887,-106.48061,2103.4],[35.20893,-106.48056,2106.5],[35.209,-106.48054,2107],[35.20906,-106.48058,2108.1],[35.20912,-106.48057,2108.6],[35.20924,-106.48055,2108.3],[35.20931,-106.48049,2112.2],[35.20934,-106.48048,2112.2],[35.20941,-106.48047,2112.2],[35.2095,-106.4804,2116.1],[35.20956,-106.48039,2116],[35.20961,-106.48037,2115.9],[35.20968,-106.48036,2115.2],[35.21003,-106.48014,2124.9],[35.2101,-106.48017,2127],[35.21011,-106.4802,2124.8],[35.21013,-106.48021,2124.8],[35.21015,-106.48025,2126.8],[35.21019,-106.48027,2124.4],[35.21023,-106.48028,2125.2],[35.21034,-106.48028,2126.4],[35.21038,-106.48029,2128.2],[35.2104,-106.48031,2128.2],[35.21044,-106.48037,2127.6],[35.21049,-106.48039,2127.6],[35.21057,-106.48037,2128.6],[35.21062,-106.48034,2131.6],[35.21067,-106.48028,2131.4],[35.21071,-106.4802,2134.5],[35.21073,-106.48019,2134.5],[35.21081,-106.48019,2135.1],[35.21086,-106.48016,2137.3],[35.21091,-106.48009,2140],[35.21091,-106.48005,2140],[35.21094,-106.48002,2138.5],[35.21099,-106.47989,2144.1],[35.21104,-106.47987,2144.1],[35.21108,-106.47986,2143.4],[35.21115,-106.4798,2146.1],[35.21124,-106.47979,2145.9],[35.21133,-106.47973,2149.7],[35.21136,-106.47973,2150.9],[35.21151,-106.47989,2151],[35.21157,-106.47991,2152.4],[35.21164,-106.4799,2153.3],[35.21172,-106.47985,2153.9],[35.21178,-106.47985,2154.3],[35.21184,-106.47983,2157.3],[35.21192,-106.47972,2159.9],[35.21204,-106.47963,2166.5],[35.21205,-106.47963,2166.5],[35.21215,-106.47982,2163.9],[35.21227,-106.47991,2166.8],[35.21242,-106.47996,2168.9],[35.21265,-106.48007,2172.6],[35.21278,-106.48008,2175.6],[35.21319,-106.48006,2183.6],[35.21326,-106.48008,2185.5],[35.21334,-106.48011,2183.5],[35.21353,-106.48013,2189.8],[35.21384,-106.48028,2193.4],[35.21403,-106.48044,2196.6],[35.2143,-106.48061,2201.1],[35.21434,-106.48064,2201.1],[35.21436,-106.48067,2201.5],[35.21438,-106.48069,2201.5],[35.21439,-106.48069,2201.5],[35.2144,-106.48068,2201.5],[35.21441,-106.48058,2201.5],[35.21439,-106.48052,2200.5],[35.21433,-106.48045,2203.1],[35.21428,-106.48036,2202.1],[35.21426,-106.4803,2203.8],[35.2142,-106.48026,2205],[35.21409,-106.48012,2205.8],[35.21399,-106.47993,2207.3],[35.21398,-106.47984,2208.5],[35.21398,-106.47979,2209.2],[35.21393,-106.47961,2208.1],[35.21388,-106.47957,2211.9],[35.21384,-106.47947,2215.9],[35.21383,-106.4794,2215.7],[35.21381,-106.47934,2215.7],[35.21381,-106.47924,2215.5],[35.2138,-106.47919,2215.3],[35.21374,-106.47907,2219.8],[35.21369,-106.47899,2223.1],[35.21352,-106.47865,2224.3],[35.21348,-106.47859,2227.3],[35.21335,-106.47848,2232.6],[35.21329,-106.47836,2232],[35.21324,-106.47821,2230.9],[35.21324,-106.47811,2230.7],[35.21321,-106.47801,2234.5],[35.21317,-106.47796,2234.5],[35.21312,-106.47785,2235.3],[35.21308,-106.47773,2238.5],[35.21307,-106.47767,2239.2],[35.21303,-106.4778,2238.8],[35.21303,-106.47797,2239.8],[35.21301,-106.47799,2240.6],[35.21299,-106.478,2240.6],[35.21294,-106.47792,2241.9],[35.2129,-106.47786,2243.3],[35.21283,-106.47776,2246.1],[35.21279,-106.4777,2246.4],[35.2128,-106.47767,2249.2],[35.21287,-106.47763,2248.3],[35.2129,-106.47745,2249.9],[35.21291,-106.47728,2253.1],[35.21291,-106.47724,2253.9],[35.21284,-106.477,2257.4],[35.21273,-106.47675,2265.5],[35.21273,-106.47676,2265.5],[35.21272,-106.47702,2267.5],[35.2127,-106.47715,2266.7],[35.21268,-106.47717,2266.7],[35.21247,-106.47718,2270.1],[35.21257,-106.47699,2275.5],[35.21257,-106.47697,2275.5],[35.21256,-106.47697,2275.5],[35.2124,-106.47706,2278.9],[35.21235,-106.4771,2278],[35.21223,-106.47715,2284.4],[35.2122,-106.47718,2280.8],[35.2122,-106.47713,2284.4],[35.21226,-106.47683,2293.7],[35.21226,-106.47682,2293.7],[35.21225,-106.47682,2293.7],[35.21222,-106.47683,2296.9],[35.21212,-106.47694,2294.8],[35.21211,-106.47694,2294.8],[35.21211,-106.47693,2294.8],[35.21215,-106.4767,2302],[35.21211,-106.47637,2303.7],[35.21211,-106.47615,2304.9],[35.21211,-106.47611,2307],[35.21214,-106.47605,2310.1],[35.21219,-106.47596,2309.2],[35.21221,-106.47578,2314],[35.2122,-106.47578,2314],[35.21213,-106.47589,2313.5],[35.21216,-106.47576,2319.1],[35.21216,-106.47572,2319.1],[35.21211,-106.47554,2320.1],[35.21205,-106.47542,2324],[35.21199,-106.47536,2326.6],[35.21198,-106.47535,2326.6],[35.21197,-106.47535,2326.6],[35.21197,-106.47537,2326.6],[35.21199,-106.47549,2329.8],[35.21199,-106.47556,2330.3],[35.21198,-106.4756,2330.3],[35.21196,-106.47564,2334.3],[35.2119,-106.47552,2334.5],[35.21187,-106.47548,2339.1],[35.21184,-106.47546,2339.1],[35.21182,-106.47543,2341.4],[35.21175,-106.47533,2343.4],[35.21156,-106.47514,2347],[35.21153,-106.47505,2349.1],[35.21153,-106.47499,2348.1],[35.21143,-106.4746,2352.6],[35.21142,-106.47448,2353.7],[35.21144,-106.47432,2357.1],[35.2114,-106.47407,2363],[35.21143,-106.47391,2362.4],[35.21144,-106.47384,2362.4],[35.21146,-106.47379,2364.2],[35.21146,-106.47368,2365.5],[35.21144,-106.47359,2366.2],[35.21144,-106.47343,2367.8],[35.21143,-106.47336,2369.3],[35.21143,-106.47331,2372.1],[35.21144,-106.47329,2372.1],[35.2115,-106.47323,2368.2],[35.2116,-106.47309,2372.2],[35.21161,-106.47306,2372.2],[35.2116,-106.47295,2377.7],[35.21164,-106.47282,2374.3],[35.21164,-106.47263,2377.8],[35.21164,-106.47254,2378.9],[35.21162,-106.47245,2380.6],[35.21162,-106.47236,2382.4],[35.21165,-106.47214,2388],[35.21174,-106.47196,2391.4],[35.2118,-106.47179,2394.1],[35.21187,-106.47165,2398.2],[35.21194,-106.47157,2399.6],[35.21203,-106.47149,2401.2],[35.21204,-106.47141,2401.8],[35.21207,-106.47136,2401.8],[35.21214,-106.4712,2406.2],[35.21215,-106.47115,2410.2],[35.21219,-106.47105,2412.9],[35.21217,-106.4709,2420.2],[35.21216,-106.47088,2420.2],[35.21211,-106.47089,2420.2],[35.21203,-106.47094,2422.9],[35.21202,-106.47088,2424.8],[35.21203,-106.47085,2424.8],[35.21202,-106.47082,2426.7],[35.21208,-106.47073,2427.4],[35.21212,-106.47064,2428.6],[35.21209,-106.47057,2429.8],[35.21208,-106.47053,2431.6],[35.21206,-106.47051,2431.6],[35.21208,-106.47043,2433.3],[35.21215,-106.4703,2436.8],[35.2122,-106.47025,2438.2],[35.21223,-106.47022,2439.2],[35.21227,-106.47005,2443.6],[35.21231,-106.46993,2444],[35.21232,-106.46991,2448.4],[35.21228,-106.46981,2445],[35.21228,-106.46974,2446.9],[35.21224,-106.46966,2446.4],[35.21222,-106.46959,2448.5],[35.21222,-106.46954,2448.5],[35.21221,-106.46949,2450.3],[35.21219,-106.46936,2454.5],[35.21214,-106.46928,2451.8],[35.21213,-106.46923,2454],[35.21216,-106.46913,2454.8],[35.21222,-106.46907,2456.5],[35.21224,-106.46906,2456.5],[35.21227,-106.46907,2459],[35.21232,-106.46902,2460.1],[35.21234,-106.469,2460.1],[35.21234,-106.46896,2460.1],[35.21234,-106.46886,2459.5],[35.21235,-106.46878,2459.7],[35.21243,-106.4685,2462.3],[35.21254,-106.46824,2468.2],[35.21254,-106.46812,2468.1],[35.21256,-106.46801,2468.1],[35.21256,-106.46796,2468.8],[35.21254,-106.46793,2468.8],[35.21254,-106.4679,2469.7],[35.21257,-106.46781,2470],[35.21258,-106.46772,2469.8],[35.21261,-106.46763,2473.8],[35.21262,-106.46756,2473.6],[35.21274,-106.46758,2482.6],[35.21276,-106.46757,2482.6],[35.21286,-106.46751,2486.1],[35.21302,-106.46736,2498.5],[35.21323,-106.4667,2519],[35.21318,-106.46655,2515.8],[35.2132,-106.46646,2517.4],[35.21317,-106.46636,2521.5],[35.21325,-106.46621,2527.5],[35.21331,-106.4662,2531.7],[35.21333,-106.46613,2533.4],[35.21332,-106.46602,2534.8],[35.21339,-106.46582,2538.8],[35.21353,-106.4657,2546.8],[35.21356,-106.46549,2546.3],[35.21352,-106.46527,2549.4],[35.21346,-106.46519,2549.5],[35.21341,-106.4651,2550.3],[35.2134,-106.46499,2552.6],[35.21347,-106.46492,2557.2],[35.2135,-106.46481,2559.6],[35.21351,-106.4647,2563.5],[35.21361,-106.4647,2566.6],[35.21365,-106.46457,2570.7],[35.21365,-106.46449,2571.8],[35.2137,-106.46444,2573.1],[35.21375,-106.46421,2579.9],[35.21372,-106.46407,2580.6],[35.21382,-106.46395,2579.3],[35.21402,-106.46386,2583.6],[35.21408,-106.46379,2586.8],[35.21412,-106.46369,2585.6],[35.21422,-106.46361,2592.4],[35.2143,-106.46348,2595.6],[35.21439,-106.46325,2597.7],[35.21442,-106.46305,2597.9],[35.21451,-106.46302,2603],[35.2147,-106.46292,2606.7],[35.21482,-106.46272,2608.1],[35.21499,-106.46272,2610.8],[35.21512,-106.46268,2611.5],[35.21508,-106.46254,2612.9],[35.21499,-106.46231,2619.3],[35.21501,-106.46215,2619.8],[35.21506,-106.46198,2621.6],[35.21505,-106.46185,2617.3],[35.21501,-106.46177,2617.5],[35.21506,-106.46158,2621.7],[35.21503,-106.46144,2627],[35.21505,-106.46136,2629.6],[35.21504,-106.46128,2632],[35.21513,-106.4612,2634.7],[35.21507,-106.46112,2637.4],[35.21506,-106.46099,2640.1],[35.21511,-106.46088,2643.1],[35.21505,-106.46086,2644.5],[35.21504,-106.46076,2646.5],[35.21506,-106.4607,2648.3],[35.21489,-106.46028,2656.3],[35.21484,-106.4602,2656.6],[35.21478,-106.46008,2662.1],[35.21484,-106.46006,2662.1],[35.21477,-106.45986,2665.6],[35.21478,-106.45977,2672.9],[35.21475,-106.45962,2674.3],[35.21482,-106.45957,2681],[35.21485,-106.45937,2689.1],[35.2148,-106.4593,2687.8],[35.21473,-106.45902,2696],[35.21461,-106.45873,2705],[35.21448,-106.45859,2715.8],[35.21443,-106.45838,2720.7],[35.21454,-106.45825,2728],[35.21452,-106.45819,2731.7],[35.21437,-106.45809,2735.8],[35.21454,-106.45785,2752.5],[35.21445,-106.45773,2752.2],[35.21428,-106.45738,2771.2],[35.21423,-106.45701,2787.7],[35.21427,-106.45687,2794.8],[35.2142,-106.45672,2803.2],[35.21418,-106.45663,2810.9],[35.21403,-106.45648,2817.7],[35.21405,-106.45644,2817.7],[35.21384,-106.45616,2833.1],[35.21391,-106.456,2840.9],[35.21399,-106.45597,2849.8],[35.21407,-106.456,2852],[35.21407,-106.45588,2861.8],[35.21415,-106.4559,2860.6],[35.2142,-106.45576,2869.7],[35.21413,-106.45563,2874.8],[35.21408,-106.4555,2879.3],[35.2141,-106.45543,2885.2],[35.21403,-106.45534,2890.3],[35.21394,-106.45536,2886.2],[35.21386,-106.45524,2894],[35.21384,-106.45511,2906.3],[35.21366,-106.45482,2916.4],[35.21366,-106.45469,2923.9],[35.21356,-106.45455,2935],[35.21352,-106.45439,2949.2],[35.21344,-106.45418,2957.5],[35.2134,-106.454,2971.8],[35.21339,-106.45385,2975.1],[35.21345,-106.45377,2983.5],[35.21362,-106.45378,2995.8],[35.21373,-106.45372,3003.5],[35.21385,-106.45372,3008.7],[35.21408,-106.4536,3033.3],[35.21411,-106.45353,3037],[35.21439,-106.45347,3062.9],[35.21475,-106.45336,3090.7],[35.21499,-106.45342,3118],[35.21503,-106.45353,3121.3],[35.21537,-106.45353,3145.3],[35.21552,-106.45371,3153.7],[35.21569,-106.45371,3159.1],[35.21581,-106.45374,3160.6],[35.21595,-106.4537,3162.7],[35.21607,-106.4537,3163.5],[35.21628,-106.45356,3174.3],[35.21661,-106.45357,3175.8],[35.21687,-106.4534,3179.4],[35.21659,-106.45329,3191.8],[35.21677,-106.4532,3197.7],[35.21653,-106.45307,3203],[35.21667,-106.45299,3209.2],[35.21687,-106.45297,3217],[35.21704,-106.45287,3221.3],[35.21692,-106.45286,3223.9],[35.21674,-106.45279,3229.2],[35.21655,-106.45256,3237.1],[35.21641,-106.45245,3243],[35.2165,-106.45242,3244.8],[35.21654,-106.45222,3243.8],[35.21666,-106.4521,3241.3],[35.21658,-106.45206,3241.3],[35.21658,-106.45203,3241.3],[35.21668,-106.45194,3239.5],[35.21654,-106.45185,3237.7],[35.21633,-106.45159,3233],[35.21613,-106.45132,3229.4],[35.2155,-106.45084,3226.7],[35.21487,-106.45065,3227.8],[35.21444,-106.45048,3230.2],[35.21404,-106.45029,3231],[35.21356,-106.45017,3235.1],[35.21304,-106.44999,3239],[35.21269,-106.44991,3241.6],[35.21237,-106.44982,3244.1],[35.212,-106.44966,3244.3],[35.21178,-106.44963,3244.6],[35.21136,-106.44971,3244.5],[35.21124,-106.44971,3244.1],[35.21112,-106.44968,3242.2],[35.21102,-106.44959,3241.2],[35.21112,-106.44941,3239.4],[35.21028,-106.44873,3235.8],[35.21012,-106.44864,3235.2],[35.20996,-106.44858,3234.5],[35.20976,-106.44853,3233.6],[35.20956,-106.44853,3232.2],[35.20952,-106.44851,3232.2],[35.20949,-106.44846,3231.1],[35.20944,-106.44846,3231.1],[35.20932,-106.44847,3230.9],[35.20929,-106.44847,3230.9],[35.20927,-106.4484,3229],[35.20924,-106.44828,3226.8],[35.20913,-106.44801,3223],[35.20907,-106.44784,3221],[35.20907,-106.44781,3219.6],[35.2091,-106.44778,3218.9],[35.20903,-106.44773,3218.1],[35.20879,-106.44729,3215.8],[35.20839,-106.44682,3212.4],[35.2083,-106.44664,3211.9],[35.20823,-106.44652,3210.4],[35.2082,-106.44641,3209.1],[35.20818,-106.44632,3208.2],[35.20816,-106.44613,3208.1],[35.20812,-106.44595,3206.3],[35.20805,-106.44577,3205.1],[35.20797,-106.44561,3204.2],[35.20775,-106.44529,3203],[35.20757,-106.44497,3200.2],[35.20737,-106.44465,3199.1],[35.20719,-106.44445,3196.6],[35.20704,-106.44432,3196.1],[35.20699,-106.4442,3193.2],[35.20694,-106.44379,3189.8],[35.20691,-106.4437,3187.6],[35.20691,-106.44367,3187.6],[35.20693,-106.44366,3186.8],[35.20701,-106.44368,3186],[35.2071,-106.44371,3186.4],[35.20721,-106.44373,3184.3],[35.20737,-106.44374,3182.2],[35.2074,-106.44372,3182.2],[35.20728,-106.44362,3182.1],[35.20718,-106.44352,3181.1],[35.20717,-106.44347,3181.1],[35.20718,-106.44339,3179.9],[35.20716,-106.44335,3178.9],[35.20713,-106.44324,3177.8],[35.20709,-106.44312,3178],[35.20701,-106.443,3177.1],[35.20694,-106.4429,3176.9],[35.20689,-106.44273,3176],[35.20685,-106.44254,3174.9],[35.20686,-106.44247,3174.2],[35.20683,-106.44237,3174],[35.20679,-106.44224,3172.1],[35.2067,-106.44211,3172.1],[35.20663,-106.44204,3171],[35.20658,-106.44201,3171],[35.20648,-106.44187,3168.3],[35.2062,-106.44165,3167.9],[35.20611,-106.44145,3166.1],[35.20596,-106.44128,3164.9],[35.20583,-106.44117,3165],[35.20578,-106.44115,3165.7],[35.20559,-106.44109,3166.5],[35.20553,-106.44105,3167.4],[35.20545,-106.44096,3167.8],[35.20524,-106.44092,3170.1],[35.20515,-106.44089,3171.7],[35.20507,-106.44088,3172.7],[35.205,-106.44086,3173.2],[35.20496,-106.44082,3173.2],[35.2048,-106.44078,3175.3],[35.20473,-106.44076,3176],[35.20463,-106.4407,3176.5],[35.20458,-106.44068,3176],[35.20453,-106.44065,3175.8],[35.20445,-106.44052,3173.5],[35.20437,-106.44047,3172.3],[35.20427,-106.44037,3170.6],[35.20415,-106.44027,3168.1],[35.20409,-106.44018,3167.8],[35.20394,-106.44,3167.2],[35.20388,-106.43996,3168.6],[35.20376,-106.43982,3167.7],[35.20368,-106.43967,3167.8],[35.20366,-106.43952,3166.2],[35.20361,-106.43941,3166.7],[35.20357,-106.43937,3164.9],[35.20332,-106.43929,3164.5],[35.20323,-106.43925,3165.1],[35.20318,-106.43922,3164.5],[35.20311,-106.43913,3164.5],[35.20308,-106.43909,3164.5],[35.20288,-106.43897,3163.7],[35.20278,-106.43896,3164.5],[35.20274,-106.43892,3165.3],[35.20266,-106.4389,3166.3],[35.20259,-106.43886,3165.5],[35.20243,-106.43882,3167],[35.20239,-106.43879,3165.7],[35.20237,-106.43875,3165.7],[35.20226,-106.43861,3163.1],[35.20209,-106.43848,3162.5],[35.20207,-106.43847,3162.9],[35.20202,-106.43847,3162.9],[35.20195,-106.4385,3162.9],[35.20183,-106.43849,3162.5],[35.20163,-106.43838,3161.2],[35.20152,-106.43833,3159.7],[35.20142,-106.43825,3158.7],[35.20131,-106.43823,3158.6],[35.20124,-106.4382,3155.7],[35.20118,-106.43815,3155.8],[35.20105,-106.43798,3154.9],[35.20089,-106.4379,3156],[35.20083,-106.43789,3156.5],[35.2006,-106.4379,3158],[35.2005,-106.43788,3158.9],[35.20041,-106.43783,3158.5],[35.2003,-106.43774,3161.2],[35.20023,-106.4376,3161.9],[35.20023,-106.43748,3160.9],[35.2,-106.43716,3157.7],[35.19996,-106.43705,3157],[35.19989,-106.43696,3156.4],[35.19982,-106.43691,3155.6],[35.1997,-106.43678,3155],[35.19968,-106.43675,3156],[35.1996,-106.43649,3150.5],[35.19958,-106.43645,3150.5],[35.19925,-106.43621,3150.2],[35.19916,-106.4361,3149.6],[35.19907,-106.43604,3148.7],[35.19906,-106.43603,3149.9],[35.19905,-106.43597,3147.5],[35.19904,-106.43595,3147.5],[35.19888,-106.43585,3147.1],[35.19878,-106.43575,3146.7],[35.19871,-106.4357,3145.4],[35.19861,-106.43562,3143.7],[35.19847,-106.43557,3144.5],[35.19839,-106.4355,3143.4],[35.19829,-106.43544,3142],[35.19827,-106.43541,3142.6],[35.19803,-106.4353,3141.7],[35.1978,-106.43528,3144.9],[35.19776,-106.43524,3144.2],[35.19771,-106.43522,3143],[35.19755,-106.43509,3138.8],[35.19731,-106.43495,3137.6],[35.19722,-106.4349,3136.9],[35.19697,-106.43483,3136]];
+const track = ascent.concat(ascent.slice(0, -1).reverse());
+const turnIdx = ascent.length - 1; // the tram's upper terminal
+
+// ---------- Distance / stats ----------
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+let cumDist = [0]; // meters, cumulative, same length as track
+let totalDist = 0;
+let minEle = Infinity, maxEle = -Infinity;
+
+for (let i = 0; i < track.length; i++) {
+  const [lat, lon, ele] = track[i];
+  if (ele < minEle) minEle = ele;
+  if (ele > maxEle) maxEle = ele;
+  if (i > 0) {
+    totalDist += haversine(track[i-1][0], track[i-1][1], lat, lon);
+    cumDist.push(totalDist);
+  }
+}
+
+// Elevation gain with a 5 m hysteresis, so meter-scale noise in the
+// elevation data doesn't pile up into phantom climbing — the raw per-point
+// sum overstates this route's gain by ~900 ft. 5 m lands within a few feet
+// of AllTrails' own figure (4,908 ft). climbAt[i] is the cumulative smoothed
+// gain up to point i, which also drives the Naismith pace model below.
+const HYST_M = 5;
+const climbAt = [0];
+let gain = 0;
+{
+  let ref = track[0][2];
+  for (let i = 1; i < track.length; i++) {
+    const e = track[i][2];
+    if (e - ref >= HYST_M) { gain += e - ref; ref = e; }
+    else if (ref - e >= HYST_M) { ref = e; }
+    climbAt.push(gain);
+  }
+}
+const gainFt = Math.round(gain * 3.28084).toLocaleString();
+
+// Highest point (top of La Luz, near the crest) — the upper reference point
+// for the temperature model and the live-forecast fetch.
+let peakIdx = 0;
+for (let i = 1; i <= turnIdx; i++) {
+  if (track[i][2] > track[peakIdx][2]) peakIdx = i;
+}
+const peak = track[peakIdx];
+const start = track[0], turn = track[turnIdx];
+
+// ---------- Map ----------
+const latlngs = track.map(p => [p[0], p[1]]);
+
+// zoomSnap: 0.25 lets fitBounds settle on a fractional zoom instead of
+// rounding down and leaving a near-full zoom level of wasted margin.
+const map = L.map('map', { zoomControl: true, zoomSnap: 0.25 });
+const initialBounds = L.latLngBounds(latlngs);
+
+// Move Leaflet's attribution out of its default overlay into the card footer.
+const attributionEl = map.attributionControl.getContainer();
+const mapFooterEl = document.getElementById('map-footer');
+if (attributionEl && mapFooterEl) mapFooterEl.appendChild(attributionEl);
+
+// Until the user pans/zooms the map themselves, keep it auto-fit to the
+// route — the container can keep settling after the first fitBounds().
+let userAdjustedMap = false;
+let programmaticMove = false;
+const FIT_MARGIN_FRACTION = 0.05;
+function fitToRoute() {
+  programmaticMove = true;
+  const size = map.getSize();
+  const padding = [size.x * FIT_MARGIN_FRACTION, size.y * FIT_MARGIN_FRACTION];
+  map.fitBounds(initialBounds, { padding, animate: false });
+  programmaticMove = false;
+}
+fitToRoute();
+map.on('zoomstart', () => { if (!programmaticMove) userAdjustedMap = true; });
+map.on('dragstart', () => { userAdjustedMap = true; });
+
+const ResetZoomControl = L.Control.extend({
+  options: { position: 'topleft' },
+  onAdd: function() {
+    const container = L.DomUtil.create('div', 'leaflet-bar');
+    const btn = L.DomUtil.create('a', 'reset-zoom-btn', container);
+    btn.href = '#';
+    btn.title = 'Reset zoom';
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 8 3 3 8 3"/><polyline points="16 3 21 3 21 8"/><polyline points="21 16 21 21 16 21"/><polyline points="8 21 3 21 3 16"/></svg>';
+    L.DomEvent.on(btn, 'click', function(e) {
+      L.DomEvent.stop(e);
+      userAdjustedMap = false;
+      fitToRoute();
+    });
+    return container;
+  }
+});
+map.addControl(new ResetZoomControl());
+
+const DownloadGpxControl = L.Control.extend({
+  options: { position: 'topleft' },
+  onAdd: function() {
+    const container = L.DomUtil.create('div', 'leaflet-bar');
+    const btn = L.DomUtil.create('a', 'download-gpx-btn', container);
+    btn.href = '#';
+    btn.title = 'Download GPX';
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><polyline points="6 11 12 17 18 11"/><path d="M4 21h16"/></svg>';
+    L.DomEvent.on(btn, 'click', function(e) {
+      L.DomEvent.stop(e);
+      downloadGpx();
+    });
+    return container;
+  }
+});
+map.addControl(new DownloadGpxControl());
+
+// ---------- Require Ctrl/Cmd + scroll to zoom the map ----------
+// Intercept wheel events in the capture phase so a plain scroll passes
+// through to the page and only Ctrl/Cmd+scroll reaches Leaflet's zoom.
+const mapEl = document.getElementById('map');
+const scrollHint = document.getElementById('scroll-zoom-hint');
+const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
+scrollHint.textContent = isMac ? 'Use ⌘ + scroll to zoom the map' : 'Use Ctrl + scroll to zoom the map';
+
+let hintTimeout;
+function showScrollHint() {
+  scrollHint.classList.add('visible');
+  clearTimeout(hintTimeout);
+  hintTimeout = setTimeout(() => scrollHint.classList.remove('visible'), 1200);
+}
+
+mapEl.addEventListener('wheel', function(e) {
+  if (e.ctrlKey || e.metaKey) {
+    e.preventDefault();
+  } else {
+    e.stopPropagation();
+    showScrollHint();
+  }
+}, { capture: true, passive: false });
+
+// Leaflet's popup close button is an <a href="#">, which some mobile webviews
+// treat as a link to "open" — strip the href and close the popup directly.
+map.on('popupopen', function(e) {
+  const btn = e.popup._closeButton;
+  if (btn) {
+    btn.removeAttribute('href');
+    L.DomEvent.off(btn, 'click');
+    L.DomEvent.on(btn, 'click', function(ev) {
+      L.DomEvent.stop(ev);
+      map.closePopup(e.popup);
+    });
+  }
+});
+
+L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+  maxZoom: 17,
+  attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+}).addTo(map);
+
+const ROUTE_COLOR = '#ef767a';
+const trackLine = L.polyline(latlngs, {
+  color: ROUTE_COLOR,
+  weight: 5,
+  opacity: 0.95,
+  lineJoin: 'round'
+}).addTo(map);
+
+// ---------- Pace model ----------
+// 2.0 mph baseline + Naismith's rule (+1 hr per 2,000 ft of ascent), the
+// same model as the Agua Piedra page. Lands at ~9.5 hr for the round trip,
+// in line with AllTrails' own 9–10 hr estimate.
+const TRIP_DATE = '2026-10-09';
+const START_HOUR = 7;          // 7 AM, right around sunrise
+const TOP_BREAK_HR = 0.5;      // rest/lunch at the tram's upper terminal
+const PACE_MPH = 2.0;
+const CLIMB_HR_PER_M = 1 / 609.6;
+
+const hourAtPoint = track.map((p, i) =>
+  START_HOUR + (cumDist[i] / 1609.34) / PACE_MPH + climbAt[i] * CLIMB_HR_PER_M + (i > turnIdx ? TOP_BREAK_HR : 0));
+const topHour = hourAtPoint[turnIdx];
+const finishHour = hourAtPoint[track.length - 1];
+
+function fmtHour(h) {
+  h = ((h % 24) + 24) % 24;
+  let hr = Math.floor(h);
+  let min = Math.round((h - hr) * 60);
+  if (min === 60) { hr = (hr + 1) % 24; min = 0; }
+  const ampm = hr < 12 ? 'AM' : 'PM';
+  let hr12 = hr % 12; if (hr12 === 0) hr12 = 12;
+  return `${hr12}:${min.toString().padStart(2,'0')} ${ampm}`;
+}
+
+// Nearest-15-minutes phrasing for prose ("12:30 PM"), dropping ":00" on the hour.
+function fmtHourNatural(h) {
+  h = ((h % 24) + 24) % 24;
+  const totalQuarterHours = Math.round(h * 4);
+  const hr = Math.floor(totalQuarterHours / 4) % 24;
+  const min = (totalQuarterHours % 4) * 15;
+  const ampm = hr < 12 ? 'AM' : 'PM';
+  let hr12 = hr % 12; if (hr12 === 0) hr12 = 12;
+  return min === 0 ? `${hr12} ${ampm}` : `${hr12}:${min.toString().padStart(2,'0')} ${ampm}`;
+}
+
+function fmtMiles(mi) {
+  const rounded = Math.round(mi * 10) / 10;
+  return rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1);
+}
+
+function fmtDuration(hrs) {
+  const quarters = Math.round(hrs * 4) / 4;
+  const h = Math.floor(quarters), m = Math.round((quarters - h) * 60);
+  return m === 0 ? `${h} hours` : `${h} hours ${m} minutes`;
+}
+
+// ---------- Summary ----------
+const itinBody = document.getElementById('itin-body');
+const upMi = cumDist[turnIdx] / 1609.34;
+const upGainFt = Math.round(climbAt[turnIdx] * 3.28084).toLocaleString();
+let sunsetText = '6:38 PM';
+
+function renderSummary() {
+  itinBody.innerHTML = `
+    <div class="itin-day itin-up">
+      <div class="itin-label">Up<span class="itin-temp" id="temp-badge-up"></span></div>
+      <div class="itin-stats">Starting at the Sandia Peak Tramway parking lot at ${fmtHourNatural(START_HOUR)}, heading north along the foothills to join La Luz and then climbing to the crest, you'd reach the top of the tram around ${fmtHourNatural(topHour)} &mdash; ${fmtMiles(upMi)} miles with ${upGainFt} feet of elevation gain, topping out at ${Math.round(peak[2] * 3.28084).toLocaleString()} ft.</div>
+    </div>
+    <div class="itin-day itin-down">
+      <div class="itin-label">Down<span class="itin-temp" id="temp-badge-down"></span></div>
+      <div class="itin-stats">After a ${Math.round(TOP_BREAK_HR * 60)}-minute break at the top, retracing the route gets you back to the car around ${fmtHourNatural(finishHour)}, well ahead of the ${sunsetText} sunset. Or ride the tram down instead and be back by early afternoon.</div>
+    </div>
+    <div class="itin-day itin-totals">
+      <div class="itin-label">Totals</div>
+      <div class="itin-stats">Altogether, the out-and-back covers ${fmtMiles(totalDist / 1609.34)} miles, with ${gainFt} feet of elevation gain and the same again coming down, in about ${fmtDuration(finishHour - START_HOUR)} including the break.</div>
+    </div>`;
+}
+renderSummary();
+
+// ---------- Weather model ----------
+// Two reference points: the trailhead and the high point at the top of La
+// Luz. Every point on the route gets a value interpolated between the two by
+// elevation, at the hour the pace model says you'll be there.
+//
+// Fallback (until the live fetch lands, or if it fails): a rough
+// early-October estimate — ~44–68°F at the trailhead, ~34–52°F near the
+// crest — spread across the day with a smooth diurnal curve.
+const TH_ELEV_M = start[2], HP_ELEV_M = peak[2];
+const FALLBACK = { thLow: 44, thHigh: 68, hpLow: 34, hpHigh: 52 };
+
+function diurnalTemp(hourOfDay, low, high) {
+  // Smooth daily cycle: low at 6 AM, high at 3 PM
+  const trough = 6, peakHr = 15;
+  const h = ((hourOfDay - trough) % 24 + 24) % 24;
+  if (h <= (peakHr - trough)) {
+    const frac = h / (peakHr - trough);
+    return low + (high - low) * (1 - Math.cos(Math.PI * frac)) / 2;
+  } else {
+    const fallDur = 24 - (peakHr - trough);
+    const frac = (h - (peakHr - trough)) / fallDur;
+    return high - (high - low) * (1 - Math.cos(Math.PI * frac)) / 2;
+  }
+}
+
+function elevFrac(elevM) {
+  return Math.max(0, Math.min(1, (elevM - TH_ELEV_M) / (HP_ELEV_M - TH_ELEV_M)));
+}
+
+// Linear interpolation into a 24-entry hourly series at a fractional hour.
+function hourlyAt(series, h) {
+  const lo = Math.max(0, Math.min(series.length - 1, Math.floor(h)));
+  const hi = Math.min(lo + 1, series.length - 1);
+  const f = Math.max(0, Math.min(1, h - lo));
+  return series[lo] + (series[hi] - series[lo]) * f;
+}
+
+const tempAtPoint = new Array(track.length).fill(0);
+const precipAtPoint = new Array(track.length).fill(0);
+const windAtPoint = new Array(track.length).fill(0);
+let minTemp, maxTemp, maxPrecip = 10;
+let liveTh = null, liveHp = null; // hourly series for TRIP_DATE, when live
+let dayRanges = { th: [FALLBACK.thLow, FALLBACK.thHigh], hp: [FALLBACK.hpLow, FALLBACK.hpHigh] };
+
+function rebuildWeatherModel() {
+  for (let i = 0; i < track.length; i++) {
+    const h = hourAtPoint[i];
+    const f = elevFrac(track[i][2]);
+    if (liveTh && liveHp) {
+      const tTh = hourlyAt(liveTh.temperature_2m, h), tHp = hourlyAt(liveHp.temperature_2m, h);
+      tempAtPoint[i] = tTh + (tHp - tTh) * f;
+      const pTh = hourlyAt(liveTh.precipitation_probability, h), pHp = hourlyAt(liveHp.precipitation_probability, h);
+      precipAtPoint[i] = pTh + (pHp - pTh) * f;
+      const wTh = hourlyAt(liveTh.windspeed_10m, h), wHp = hourlyAt(liveHp.windspeed_10m, h);
+      windAtPoint[i] = wTh + (wHp - wTh) * f;
+    } else {
+      const low = FALLBACK.thLow + (FALLBACK.hpLow - FALLBACK.thLow) * f;
+      const high = FALLBACK.thHigh + (FALLBACK.hpHigh - FALLBACK.thHigh) * f;
+      tempAtPoint[i] = diurnalTemp(h, low, high);
+    }
+  }
+  minTemp = Math.min(...tempAtPoint);
+  maxTemp = Math.max(...tempAtPoint);
+  maxPrecip = Math.max(10, Math.max(...precipAtPoint));
+}
+
+// Badges on the Up/Down cards: the full-day range at the trailhead and at
+// the high point (not just the narrower range you'll pass through while
+// moving — that's what the temperature graph shows).
+function updateTempBadges() {
+  const up = document.getElementById('temp-badge-up');
+  const down = document.getElementById('temp-badge-down');
+  const r = ([lo, hi]) => `${Math.round(lo)}–${Math.round(hi)}°F`;
+  if (up) up.textContent = `Top ${r(dayRanges.hp)}`;
+  if (down) down.textContent = `Car ${r(dayRanges.th)}`;
+}
+
+rebuildWeatherModel();
+updateTempBadges();
+
+// ---------- Live forecast (Open-Meteo) ----------
+// No key, no server, CORS-enabled: https://open-meteo.com/en/docs (CC BY 4.0,
+// needs attribution). Sampled at the trailhead and the high point's own
+// coordinates/elevation, then interpolated along the route as above. Falls
+// back silently to the estimate if the fetch fails or the date ever falls
+// outside the forecast window.
+const forecastNoteEl = document.getElementById('forecast-note-text');
+const daylightNoteEl = document.getElementById('daylight-note-text');
+
+function isoToHour(iso) {
+  const [hh, mm] = iso.split('T')[1].split(':').map(Number);
+  return hh + mm / 60;
+}
+
+async function loadLiveForecast() {
+  const points = [start, peak];
+  const lat = points.map(p => p[0]).join(',');
+  const lon = points.map(p => p[1]).join(',');
+  const elev = points.map(p => p[2]).join(',');
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+    `&elevation=${elev}&hourly=temperature_2m,precipitation_probability,windspeed_10m` +
+    `&daily=sunrise,sunset&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=America%2FDenver` +
+    `&start_date=${TRIP_DATE}&end_date=${TRIP_DATE}`;
+
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Open-Meteo HTTP ${res.status}`);
+  const [th, hp] = await res.json();
+  if (!th || !hp || th.error || hp.error) throw new Error('Open-Meteo returned an error payload');
+  if (!th.hourly || th.hourly.temperature_2m.length < 24 || th.hourly.temperature_2m.some(v => v === null)) {
+    throw new Error(`No live data for ${TRIP_DATE}`);
+  }
+
+  liveTh = th.hourly;
+  liveHp = hp.hourly;
+  const range = arr => [Math.min(...arr), Math.max(...arr)];
+  dayRanges = { th: range(liveTh.temperature_2m), hp: range(liveHp.temperature_2m) };
+  rebuildWeatherModel();
+
+  let sunriseText = '';
+  if (th.daily && th.daily.sunrise && th.daily.sunset) {
+    sunriseText = fmtHour(isoToHour(th.daily.sunrise[0]));
+    sunsetText = fmtHour(isoToHour(th.daily.sunset[0]));
+    if (daylightNoteEl) {
+      daylightNoteEl.innerHTML = `On Oct 9, sunrise is at ${sunriseText} and sunset at ${sunsetText} (per Open-Meteo). The plan above starts at first light and finishes with a comfortable buffer, but if the day runs long the descent is the worst place to lose the light &mdash; bring a headlamp.`;
+    }
+  }
+  renderSummary();
+  updateTempBadges();
+  renderEnergy();
+  drawTemp(-1);
+  drawPrecip(-1);
+
+  if (forecastNoteEl) {
+    const pulled = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+    const maxP = Math.round(Math.max(...liveTh.precipitation_probability, ...liveHp.precipitation_probability));
+    const maxW = Math.round(Math.max(...liveTh.windspeed_10m, ...liveHp.windspeed_10m));
+    forecastNoteEl.innerHTML = `<strong>Live forecast</strong> pulled from <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> on ${pulled}, sampled directly at the trailhead and at the high point's coordinates/elevation and interpolated by elevation and time of day along the route. For Oct 9: ${Math.round(dayRanges.th[0])}&ndash;${Math.round(dayRanges.th[1])}&deg;F at the trailhead, ${Math.round(dayRanges.hp[0])}&ndash;${Math.round(dayRanges.hp[1])}&deg;F near the crest, up to ${maxP}% precip chance, winds to ${maxW} mph. Cross-check against the <a href="https://forecast.weather.gov/MapClick.php?lat=${peak[0]}&lon=${peak[1]}" target="_blank" rel="noopener">National Weather Service point forecast for the crest</a> and the <a href="https://www.alltrails.com/explore/custom-routes/la-luz-trail-from-sandia-peak-tramway-parking-66f83fb?u=i&amp;sh=se65qt" target="_blank" rel="noopener">AllTrails forecast</a> &mdash; any single model can miss mountain wind and weather. The forecast is pulled fresh every time the page loads, and reverts to the seasonal estimate once Oct 9 has passed.`;
+  }
+}
+
+loadLiveForecast().catch(err => {
+  console.warn('Live forecast unavailable, showing estimate instead:', err);
+  if (forecastNoteEl) {
+    forecastNoteEl.innerHTML = forecastNoteEl.innerHTML.replace(/<em>.*<\/em>/, '<em>(A live-forecast update was attempted on page load and failed, so this is still the seasonal estimate, not live data. Reload the page, or check a forecast directly.)</em>');
+  }
+});
+
+// ---------- Energy & hydration ----------
+// Pandolf (W): M = 1.5W + 2(W+L)(L/W)^2 + η(W+L)(1.5V^2 + 0.35VG), with
+// grade from elevation smoothed over ±100 m so per-point noise doesn't
+// inflate it, and descents clamped to G = 0.
+const BODY_KG = 77.1, PACK_KG = 6.8, ETA = 1.2; // 170 lb, 15 lb, dirt/rocky trail
+const smoothEle = track.map((p, i) => {
+  let s = 0, n = 0;
+  for (let j = i; j >= 0 && cumDist[i] - cumDist[j] <= 100; j--) { s += track[j][2]; n++; }
+  for (let j = i + 1; j < track.length && cumDist[j] - cumDist[i] <= 100; j++) { s += track[j][2]; n++; }
+  return s / n;
+});
+
+function legStats(i0, i1) {
+  const W = BODY_KG, L = PACK_KG;
+  let kcal = 0, liters = 0, hrs = 0;
+  for (let i = i0 + 1; i <= i1; i++) {
+    const d = cumDist[i] - cumDist[i-1];
+    if (d <= 0) continue;
+    const dt = (d / 1609.34) / PACE_MPH + (climbAt[i] - climbAt[i-1]) * CLIMB_HR_PER_M;
+    const V = d / (dt * 3600);
+    const G = Math.min(40, Math.max(0, (smoothEle[i] - smoothEle[i-1]) / d * 100));
+    const M = 1.5 * W + 2 * (W + L) * (L / W) ** 2 + ETA * (W + L) * (1.5 * V * V + 0.35 * V * G);
+    kcal += M * dt * 3600 / 4184;
+    let rate = 0.5;
+    if (G > 10) rate *= 1.25;
+    if (track[i][2] > 2438) rate += 0.1; // above 8,000 ft
+    if (tempAtPoint[i] > 70) rate += 0.1;
+    liters += rate * dt;
+    hrs += dt;
+  }
+  return { kcal, liters, hrs };
+}
+
+function kcalRange(k) {
+  const lo = Math.round(k * 0.97 / 10) * 10, hi = Math.round(k * 1.03 / 10) * 10;
+  return `${lo.toLocaleString()} to ${hi.toLocaleString()}`;
+}
+function literRange(l) {
+  const lo = Math.max(0.5, Math.round(l * 2) / 2);
+  return `${fmtMiles(lo)} to ${fmtMiles(lo + 0.5)}`;
+}
+
+function renderEnergy() {
+  const up = legStats(0, turnIdx);
+  const down = legStats(turnIdx, track.length - 1);
+  document.getElementById('energy-body').innerHTML = `
+    <div class="itin-day itin-up">
+      <div class="itin-label">Up</div>
+      <div class="itin-stats">You'll burn roughly ${kcalRange(up.kcal)} calories on the climb, over about ${fmtDuration(up.hrs)} of hiking. Plan on about ${literRange(up.liters)} liters of water for this half &mdash; it's the long, steep, sunny part.</div>
+    </div>
+    <div class="itin-day itin-down">
+      <div class="itin-label">Down</div>
+      <div class="itin-stats">You'll burn roughly ${kcalRange(down.kcal)} calories on the descent, over about ${fmtDuration(down.hrs)}. Plan on about ${literRange(down.liters)} liters, and remember the lower trail is warmest in the afternoon, right when you'll be on it.</div>
+    </div>
+    <div class="itin-day itin-totals">
+      <div class="itin-label">Totals</div>
+      <div class="itin-stats">Roughly ${kcalRange(up.kcal + down.kcal)} calories hiking &mdash; aim to eat around 200&ndash;300 calories an hour on the move. Carry about ${literRange(up.liters + down.liters)} liters total from the car, since there's no water on the trail. If you ride the tram down, only the Up numbers apply.</div>
+    </div>`;
+}
+renderEnergy();
+
+// ---------- Start / turnaround markers ----------
+function dotIcon(cls) {
+  return L.divIcon({ className: cls, iconSize: [14,14] });
+}
+
+L.marker([start[0], start[1]], { icon: dotIcon('marker-label') })
+  .addTo(map)
+  .bindPopup(`<b>Start &amp; finish</b><br>Sandia Peak Tramway parking<br>${Math.round(start[2]*3.28084).toLocaleString()} ft`);
+
+L.marker([turn[0], turn[1]], { icon: dotIcon('marker-label') })
+  .addTo(map)
+  .bindPopup(`<b>Turnaround</b><br>Sandia Peak Tramway upper terminal<br>${Math.round(turn[2]*3.28084).toLocaleString()} ft, ${(cumDist[turnIdx]/1609.34).toFixed(1)} mi in`);
+
+// ---------- GPX export ----------
+function escapeXml(str) {
+  return String(str).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[ch]));
+}
+
+function gpxWpt(lat, lon, name, desc, type) {
+  return `  <wpt lat="${lat}" lon="${lon}">
+    <name>${escapeXml(name)}</name>
+    <desc>${escapeXml(desc)}</desc>
+    <type>${escapeXml(type)}</type>
+  </wpt>`;
+}
+
+function buildGpx() {
+  const wpts = [
+    gpxWpt(start[0], start[1], 'Start & finish', `Sandia Peak Tramway parking, ${Math.round(start[2] * 3.28084).toLocaleString()} ft`, 'Landmark'),
+    gpxWpt(turn[0], turn[1], 'Turnaround', `Sandia Peak Tramway upper terminal, ${Math.round(turn[2] * 3.28084).toLocaleString()} ft, ${(cumDist[turnIdx] / 1609.34).toFixed(1)} mi in`, 'Landmark')
+  ];
+  const trkpts = track.map(([lat, lon, ele]) => `      <trkpt lat="${lat}" lon="${lon}"><ele>${ele}</ele></trkpt>`).join('\n');
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="La Luz Trail from Sandia Peak Tramway" xmlns="http://www.topografix.com/GPX/1/1">
+${wpts.join('\n')}
+  <trk>
+    <name>La Luz Trail from Sandia Peak Tramway</name>
+    <trkseg>
+${trkpts}
+    </trkseg>
+  </trk>
+</gpx>`;
+}
+
+function downloadGpx() {
+  const blob = new Blob([buildGpx()], { type: 'application/gpx+xml' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'La_Luz_Trail_from_Sandia_Peak_Tramway.gpx';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ---------- Hover marker synced with the profile ----------
+const hoverMarker = L.marker([start[0], start[1]], { icon: dotIcon('hover-dot'), interactive: false, opacity: 0 }).addTo(map);
+
+// The route is an out-and-back, so every spot on the map line is passed
+// twice; hovering the map shows the way up (the first match).
+trackLine.on('mousemove', function(e) {
+  let best = 0, bestD = Infinity;
+  const ll = e.latlng;
+  for (let i = 0; i <= turnIdx; i++) {
+    const d = (track[i][0]-ll.lat)**2 + (track[i][1]-ll.lng)**2;
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  showHover(best);
+});
+trackLine.on('mouseout', clearHover);
+
+// ---------- Elevation / temperature / precipitation profile ----------
+const elevCanvas = document.getElementById('elev-canvas');
+const elevCtx = elevCanvas.getContext('2d');
+const tempCanvas = document.getElementById('temp-canvas');
+const tempCtx = tempCanvas.getContext('2d');
+const precipCanvas = document.getElementById('precip-canvas');
+const precipCtx = precipCanvas.getContext('2d');
+const profileWrap = document.getElementById('profile-wrap');
+const profileFooter = document.getElementById('profile-footer');
+
+function resizeCanvas() {
+  [elevCanvas, tempCanvas, precipCanvas].forEach(c => {
+    const rect = c.getBoundingClientRect();
+    c.width = rect.width * devicePixelRatio;
+    c.height = rect.height * devicePixelRatio;
+  });
+  drawElevation(-1);
+  drawTemp(-1);
+  drawPrecip(-1);
+}
+
+function drawSeries(ctx, canvas, values, valMin, valMax, hoverIndex, opts) {
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  const padL = 8 * devicePixelRatio, padR = 8 * devicePixelRatio;
+  const padT = 10 * devicePixelRatio;
+  const padB = 28 * devicePixelRatio;
+  const plotW = w - padL - padR, plotH = h - padT - padB;
+  const range = (valMax - valMin) || 1;
+
+  const xAt = i => padL + (cumDist[i] / totalDist) * plotW;
+  const yAt = i => padT + plotH - ((values[i] - valMin) / range) * plotH;
+
+  ctx.beginPath();
+  for (let i = 0; i < track.length; i++) {
+    const x = xAt(i), y = yAt(i);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.lineTo(padL + plotW, padT + plotH);
+  ctx.lineTo(padL, padT + plotH);
+  ctx.closePath();
+  ctx.fillStyle = opts.fill;
+  ctx.fill();
+
+  ctx.beginPath();
+  for (let i = 0; i < track.length; i++) {
+    const x = xAt(i), y = yAt(i);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = opts.stroke;
+  ctx.lineWidth = 2 * devicePixelRatio;
+  ctx.stroke();
+
+  // Up / down bar along the bottom, matching the summary cards' colors.
+  [[0, turnIdx, '#ef767a'], [turnIdx, track.length - 1, '#456990']].forEach(([i0, i1, color]) => {
+    ctx.beginPath();
+    ctx.moveTo(xAt(i0), padT + plotH + 4*devicePixelRatio);
+    ctx.lineTo(xAt(i1), padT + plotH + 4*devicePixelRatio);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3 * devicePixelRatio;
+    ctx.stroke();
+  });
+
+  // Dashed marker at the turnaround (tram top).
+  ctx.save();
+  ctx.setLineDash([4 * devicePixelRatio, 4 * devicePixelRatio]);
+  ctx.beginPath();
+  ctx.moveTo(xAt(turnIdx), padT);
+  ctx.lineTo(xAt(turnIdx), padT + plotH);
+  ctx.strokeStyle = 'rgba(43,42,39,0.25)';
+  ctx.lineWidth = 1 * devicePixelRatio;
+  ctx.stroke();
+  ctx.restore();
+  if (opts.turnLabel) {
+    ctx.fillStyle = '#918b7c';
+    ctx.font = `${10.5 * devicePixelRatio}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText('Tram top', xAt(turnIdx), padT + plotH + 18 * devicePixelRatio);
+    ctx.textAlign = 'left';
+  }
+
+  if (hoverIndex >= 0) {
+    const x = xAt(hoverIndex), y = yAt(hoverIndex);
+    ctx.beginPath();
+    ctx.moveTo(x, padT);
+    ctx.lineTo(x, padT + plotH);
+    ctx.strokeStyle = 'rgba(43,42,39,0.4)';
+    ctx.lineWidth = 1 * devicePixelRatio;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(x, y, 4 * devicePixelRatio, 0, Math.PI*2);
+    ctx.fillStyle = opts.stroke;
+    ctx.fill();
+  }
+}
+
+function drawElevation(hoverIndex) {
+  drawSeries(elevCtx, elevCanvas, track.map(p => p[2]), minEle, maxEle, hoverIndex, {
+    fill: 'rgba(52,73,94,0.14)',
+    stroke: '#34495e',
+    turnLabel: true
+  });
+}
+
+function drawTemp(hoverIndex) {
+  // Yellow, matching Apple Weather's temperature color.
+  drawSeries(tempCtx, tempCanvas, tempAtPoint, minTemp, maxTemp, hoverIndex, {
+    fill: 'rgba(255,204,0,0.18)',
+    stroke: '#ffcc00'
+  });
+}
+
+function drawPrecip(hoverIndex) {
+  if (!liveTh) {
+    precipCtx.clearRect(0, 0, precipCanvas.width, precipCanvas.height);
+    precipCtx.fillStyle = '#918b7c';
+    precipCtx.font = `${12.5 * devicePixelRatio}px sans-serif`;
+    precipCtx.textAlign = 'center';
+    precipCtx.fillText('Precipitation forecast unavailable', precipCanvas.width / 2, precipCanvas.height / 2);
+    precipCtx.textAlign = 'left';
+    return;
+  }
+  drawSeries(precipCtx, precipCanvas, precipAtPoint, 0, maxPrecip, hoverIndex, {
+    fill: 'rgba(52,152,219,0.16)',
+    stroke: '#3498db'
+  });
+}
+
+function showHover(idx) {
+  const p = track[idx];
+  hoverMarker.setLatLng([p[0], p[1]]);
+  hoverMarker.setOpacity(1);
+  drawElevation(idx);
+  drawTemp(idx);
+  drawPrecip(idx);
+  const liveTxt = liveTh ? ` · ${Math.round(precipAtPoint[idx])}% precip · ${Math.round(windAtPoint[idx])} mph wind` : '';
+  profileFooter.textContent = `${(cumDist[idx]/1609.34).toFixed(2)} mi · ${Math.round(p[2]*3.28084).toLocaleString()} ft · ${Math.round(tempAtPoint[idx])}°F${liveTxt} · ${fmtHour(hourAtPoint[idx])}`;
+}
+
+function clearHover() {
+  hoverMarker.setOpacity(0);
+  drawElevation(-1);
+  drawTemp(-1);
+  drawPrecip(-1);
+  profileFooter.textContent = '';
+}
+
+function indexFromClientX(clientX) {
+  const rect = profileWrap.getBoundingClientRect();
+  const x = (clientX - rect.left) / rect.width;
+  const targetDist = x * totalDist;
+  let lo = 0, hi = cumDist.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (cumDist[mid] < targetDist) lo = mid + 1; else hi = mid;
+  }
+  return Math.max(0, Math.min(track.length - 1, lo));
+}
+
+profileWrap.addEventListener('mousemove', (e) => {
+  showHover(indexFromClientX(e.clientX));
+});
+profileWrap.addEventListener('mouseleave', clearHover);
+
+// ---------- Bottom reserve + scrollable-area maintenance ----------
+// 1. iPhone Safari overlays a bottom bar CSS can't reliably describe;
+//    measure it directly. 2. iOS Safari caches the scrollable height and can
+//    miss late layout changes, so force a reflow after things settle.
+const rootEl = document.documentElement;
+let chromeInset = 0;
+
+function measureChromeInset() {
+  let best = 0;
+  try {
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:absolute;top:0;left:0;width:1px;' +
+                          'visibility:hidden;pointer-events:none;';
+    document.body.appendChild(probe);
+    probe.style.height = '100lvh';
+    const large = probe.getBoundingClientRect().height;
+    probe.style.height = '100svh';
+    const small = probe.getBoundingClientRect().height;
+    probe.remove();
+    if (large > 0 && small > 0 && large > small) best = Math.round(large - small);
+  } catch (e) { /* probe unavailable; the CSS floor covers us */ }
+
+  const vv = window.visualViewport;
+  if (vv && vv.scale <= 1.01) {
+    best = Math.max(best, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+  }
+  return Math.max(0, best);
+}
+
+function updateChromeInset(reset) {
+  if (reset) chromeInset = 0;
+  // Only ever grow within an orientation, to avoid scroll jitter.
+  const measured = measureChromeInset();
+  if (measured > chromeInset) {
+    chromeInset = measured;
+    rootEl.style.setProperty('--chrome-inset', chromeInset + 'px');
+    nudgeScrollArea();
+  } else if (reset) {
+    rootEl.style.setProperty('--chrome-inset', chromeInset + 'px');
+  }
+}
+
+function nudgeScrollArea() {
+  const b = document.body;
+  b.style.minHeight = (rootEl.scrollHeight + 1) + 'px';
+  requestAnimationFrame(() => { b.style.minHeight = ''; });
+}
+
+function relayout(reset) {
+  resizeCanvas();
+  map.invalidateSize();
+  if (!userAdjustedMap) fitToRoute();
+  updateChromeInset(reset);
+  nudgeScrollArea();
+}
+
+window.addEventListener('resize', () => relayout(false));
+window.addEventListener('orientationchange', () => {
+  setTimeout(() => relayout(true), 200);
+  setTimeout(() => relayout(false), 600);
+});
+
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', () => updateChromeInset(false));
+}
+let sampling = false;
+window.addEventListener('scroll', () => {
+  if (sampling) return;
+  sampling = true;
+  requestAnimationFrame(() => { sampling = false; updateChromeInset(false); });
+}, { passive: true });
+
+if (window.ResizeObserver) {
+  let pending = false;
+  const ro = new ResizeObserver(() => {
+    if (pending) return;
+    pending = true;
+    requestAnimationFrame(() => {
+      pending = false;
+      resizeCanvas();
+      map.invalidateSize();
+      if (!userAdjustedMap) fitToRoute();
+      nudgeScrollArea();
+    });
+  });
+  ro.observe(profileWrap);
+  ro.observe(document.querySelector('.map-body'));
+}
+
+// Re-fit once layout, tiles, and fonts have settled (see the Agua Piedra
+// page for the full story on why the first fitBounds() can be off).
+window.addEventListener('load', () => {
+  relayout(true);
+  setTimeout(() => relayout(false), 350);
+  setTimeout(() => relayout(false), 1200);
+});
+resizeCanvas();
+updateChromeInset(true);
+
+// ---------- Touch support for the profile graphs ----------
+// Mostly-sideways drags scrub the trail data; mostly-vertical ones scroll.
+let touchStartX = 0, touchStartY = 0, touchMode = null; // 'scrub' | 'scroll' | null
+
+profileWrap.addEventListener('touchstart', (e) => {
+  if (!e.touches.length) return;
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+  touchMode = null;
+  showHover(indexFromClientX(touchStartX));
+}, { passive: true });
+
+profileWrap.addEventListener('touchmove', (e) => {
+  if (!e.touches.length) return;
+  const x = e.touches[0].clientX, y = e.touches[0].clientY;
+  if (touchMode === null) {
+    const dx = Math.abs(x - touchStartX), dy = Math.abs(y - touchStartY);
+    if (dx < 6 && dy < 6) return;
+    touchMode = dx > dy ? 'scrub' : 'scroll';
+  }
+  if (touchMode === 'scrub') {
+    showHover(indexFromClientX(x));
+    e.preventDefault();
+  }
+}, { passive: false });
+
+profileWrap.addEventListener('touchend', () => {
+  clearHover();
+  touchMode = null;
+});
+</script>
+</body>
+</html>
