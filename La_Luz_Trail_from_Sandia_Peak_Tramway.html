@@ -155,6 +155,16 @@
     cursor: crosshair;
     touch-action: pan-y;
   }
+  /* Per-chart label, overlaid in the top-left corner. pointer-events: none
+     so it never interrupts hover/scrub on the canvas underneath. */
+  .profile-label {
+    position: absolute;
+    top: 6px;
+    left: 12px;
+    font-size: 0.78rem;
+    color: var(--muted);
+    pointer-events: none;
+  }
   #profile-header {
     flex-shrink: 0;
     padding: 12px 16px 6px;
@@ -440,17 +450,20 @@
       <div class="map-footer" id="map-footer"></div>
     </div>
     <div id="profile-wrap">
-      <div id="profile-header">Elevation, Temperature &amp; Precipitation</div>
+      <div id="profile-header">Trail Conditions</div>
       <div class="profile-section" id="elev-section">
         <canvas id="elev-canvas"></canvas>
+        <div class="profile-label">Elevation</div>
       </div>
       <div class="profile-divider"></div>
       <div class="profile-section" id="temp-section">
         <canvas id="temp-canvas"></canvas>
+        <div class="profile-label">Temperature</div>
       </div>
       <div class="profile-divider"></div>
-      <div class="profile-section" id="precip-section">
-        <canvas id="precip-canvas"></canvas>
+      <div class="profile-section" id="uv-section">
+        <canvas id="uv-canvas"></canvas>
+        <div class="profile-label">UV Index</div>
       </div>
       <div id="profile-footer"></div>
     </div>
@@ -480,7 +493,7 @@
       </div>
       <div class="note-item">
         <div class="note-label">Water &amp; sun</div>
-        <div class="note-text">There's no reliable water anywhere on La Luz &mdash; carry everything you'll need from the start (see Energy &amp; Hydration above). The lower half climbs through open, south- and west-facing desert scrub with very little shade, which is the main reason for an early start: by early afternoon the lower switchbacks can be far warmer than the forecast at the top suggests. The upper terminal and the restaurant at the top are possible places to buy a drink, but don't count on them.</div>
+        <div class="note-text">There's no reliable water anywhere on La Luz &mdash; carry everything you'll need from the start (see Energy &amp; Hydration above). The lower half climbs through open, south- and west-facing desert scrub with very little shade, and you'll be coming back down through it in the late afternoon, when the lower switchbacks can be far warmer than the forecast at the top suggests. UV peaks around midday, while you're on the upper climb (and getting the most of the altitude boost shown in the UV chart), and the cool air up there makes it easy to forget &mdash; sunscreen, a hat, and sunglasses. The upper terminal and the restaurant at the top are possible places to buy a drink, but don't count on them.</div>
       </div>
       <div class="note-item">
         <div class="note-label">Terrain &amp; pace</div>
@@ -670,9 +683,11 @@ map.on('popupopen', function(e) {
   }
 });
 
-L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-  maxZoom: 17,
-  attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+// Esri World Topographic Map: pale, low-contrast cartography with contours,
+// so the route line stands out. Keyless tile access with attribution.
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom: 19,
+  attribution: 'Tiles &copy; <a href="https://www.esri.com/">Esri</a> &mdash; Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC, USGS, FAO, NPS, NRCAN, GeoBase, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), and the GIS User Community'
 }).addTo(map);
 
 const ROUTE_COLOR = '#ef767a';
@@ -688,7 +703,7 @@ const trackLine = L.polyline(latlngs, {
 // same model as the Agua Piedra page. Lands at ~9.5 hr for the round trip,
 // in line with AllTrails' own 9–10 hr estimate.
 const TRIP_DATE = '2026-10-09';
-const START_HOUR = 7;          // 7 AM, right around sunrise
+const START_HOUR = 9;          // 9 AM
 const TOP_BREAK_HR = 0.5;      // rest/lunch at the tram's upper terminal
 const PACE_MPH = 2.0;
 const CLIMB_HR_PER_M = 1 / 609.6;
@@ -734,17 +749,37 @@ function fmtDuration(hrs) {
 const itinBody = document.getElementById('itin-body');
 const upMi = cumDist[turnIdx] / 1609.34;
 const upGainFt = Math.round(climbAt[turnIdx] * 3.28084).toLocaleString();
-let sunsetText = '6:38 PM';
+// Defaults are Open-Meteo's Oct 9 values; loadLiveForecast() refreshes them.
+let sunriseHour = 7 + 7/60, sunsetHour = 18 + 38/60;
+
+// How the hiking-down finish compares to sunset, in prose. The pace model
+// doesn't slow down for La Luz's rocky descent, so anything under ~1.5 hr
+// of margin is flagged rather than called comfortable.
+function sunsetPhrase() {
+  const sunset = fmtHour(sunsetHour);
+  const buffer = sunsetHour - finishHour;
+  const mins = Math.round(Math.abs(buffer) * 60 / 5) * 5;
+  if (buffer >= 1.5) return `well ahead of the ${sunset} sunset`;
+  if (buffer >= 0) return `only about ${mins} minutes before the ${sunset} sunset &mdash; not much margin, since the rocky descent often runs slower than this estimate, so bring headlamps`;
+  return `about ${mins} minutes after the ${sunset} sunset, so plan on finishing by headlamp`;
+}
+
+function renderDaylight() {
+  const el = document.getElementById('daylight-note-text');
+  if (!el) return;
+  el.innerHTML = `On Oct 9, sunrise is at ${fmtHour(sunriseHour)} and sunset at ${fmtHour(sunsetHour)}. With a ${fmtHourNatural(START_HOUR)} start, hiking back down puts you at the car around ${fmtHourNatural(finishHour)}, ${sunsetPhrase()}. Riding the tram down instead (from the top around ${fmtHourNatural(topHour)}) avoids the issue entirely.${sunsetHour - finishHour >= 1.5 ? " Either way, the descent is the worst place to lose the light &mdash; bring a headlamp." : ""}`;
+}
 
 function renderSummary() {
+  const ft = m => `${Math.round(m * 3.28084).toLocaleString()} ft`;
   itinBody.innerHTML = `
     <div class="itin-day itin-up">
       <div class="itin-label">Up<span class="itin-temp" id="temp-badge-up"></span></div>
-      <div class="itin-stats">Starting at the Sandia Peak Tramway parking lot at ${fmtHourNatural(START_HOUR)}, heading north along the foothills to join La Luz and then climbing to the crest, you'd reach the top of the tram around ${fmtHourNatural(topHour)} &mdash; ${fmtMiles(upMi)} miles with ${upGainFt} feet of elevation gain, topping out at ${Math.round(peak[2] * 3.28084).toLocaleString()} ft.</div>
+      <div class="itin-stats">Starting at the Sandia Peak Tramway parking lot (${ft(start[2])}) at ${fmtHourNatural(START_HOUR)}, heading north along the foothills to join La Luz and then climbing to the crest, you'd reach the top of the tram (${ft(turn[2])}) around ${fmtHourNatural(topHour)} &mdash; ${fmtMiles(upMi)} miles with ${upGainFt} feet of elevation gain, topping out at ${ft(peak[2])} along the way.</div>
     </div>
     <div class="itin-day itin-down">
       <div class="itin-label">Down<span class="itin-temp" id="temp-badge-down"></span></div>
-      <div class="itin-stats">After a ${Math.round(TOP_BREAK_HR * 60)}-minute break at the top, retracing the route gets you back to the car around ${fmtHourNatural(finishHour)}, well ahead of the ${sunsetText} sunset. Or ride the tram down instead and be back by early afternoon.</div>
+      <div class="itin-stats">After a ${Math.round(TOP_BREAK_HR * 60)}-minute break at the top (${ft(turn[2])}), retracing the route gets you back to the car (${ft(start[2])}) around ${fmtHourNatural(finishHour)}, ${sunsetPhrase()}. Or ride the tram down instead and be back by mid-afternoon.</div>
     </div>
     <div class="itin-day itin-totals">
       <div class="itin-label">Totals</div>
@@ -752,6 +787,7 @@ function renderSummary() {
     </div>`;
 }
 renderSummary();
+renderDaylight();
 
 // ---------- Weather model ----------
 // Two reference points: the trailhead and the high point at the top of La
@@ -790,10 +826,27 @@ function hourlyAt(series, h) {
   return series[lo] + (series[hi] - series[lo]) * f;
 }
 
+// UV index, adjusted for altitude. Open-Meteo's forecast UV barely changes
+// with the elevation it's asked for (checked Oct 3: 6.40 at both the
+// trailhead and the high point at 1 PM), so the altitude effect is added
+// here: the WHO rule of thumb is ~10% more UV per 1,000 m of elevation
+// (https://www.who.int/news-room/questions-and-answers/item/radiation-the-ultraviolet-(uv)-index).
+// Measured from the trailhead rather than sea level, since the forecast
+// already reflects roughly that terrain height — this way it can only
+// understate the boost at the top, never double-count it.
+const UV_GAIN_PER_KM = 0.10;
+function uvAltitudeFactor(elevM) {
+  return 1 + UV_GAIN_PER_KM * Math.max(0, elevM - TH_ELEV_M) / 1000;
+}
+function uvCategory(uv) {
+  const r = Math.round(uv);
+  return r >= 11 ? 'extreme' : r >= 8 ? 'very high' : r >= 6 ? 'high' : r >= 3 ? 'moderate' : 'low';
+}
+
 const tempAtPoint = new Array(track.length).fill(0);
-const precipAtPoint = new Array(track.length).fill(0);
+const uvAtPoint = new Array(track.length).fill(0);
 const windAtPoint = new Array(track.length).fill(0);
-let minTemp, maxTemp, maxPrecip = 10;
+let minTemp, maxTemp, maxUv = 6;
 let liveTh = null, liveHp = null; // hourly series for TRIP_DATE, when live
 let dayRanges = { th: [FALLBACK.thLow, FALLBACK.thHigh], hp: [FALLBACK.hpLow, FALLBACK.hpHigh] };
 
@@ -804,8 +857,7 @@ function rebuildWeatherModel() {
     if (liveTh && liveHp) {
       const tTh = hourlyAt(liveTh.temperature_2m, h), tHp = hourlyAt(liveHp.temperature_2m, h);
       tempAtPoint[i] = tTh + (tHp - tTh) * f;
-      const pTh = hourlyAt(liveTh.precipitation_probability, h), pHp = hourlyAt(liveHp.precipitation_probability, h);
-      precipAtPoint[i] = pTh + (pHp - pTh) * f;
+      uvAtPoint[i] = hourlyAt(liveTh.uv_index, h) * uvAltitudeFactor(track[i][2]);
       const wTh = hourlyAt(liveTh.windspeed_10m, h), wHp = hourlyAt(liveHp.windspeed_10m, h);
       windAtPoint[i] = wTh + (wHp - wTh) * f;
     } else {
@@ -816,7 +868,8 @@ function rebuildWeatherModel() {
   }
   minTemp = Math.min(...tempAtPoint);
   maxTemp = Math.max(...tempAtPoint);
-  maxPrecip = Math.max(10, Math.max(...precipAtPoint));
+  // Floor the axis at UV 6 ("high") so a mild day doesn't fill the chart.
+  maxUv = Math.max(6, Math.ceil(Math.max(...uvAtPoint)));
 }
 
 // Badges on the Up/Down cards: the full-day range at the trailhead and at
@@ -840,7 +893,6 @@ updateTempBadges();
 // back silently to the estimate if the fetch fails or the date ever falls
 // outside the forecast window.
 const forecastNoteEl = document.getElementById('forecast-note-text');
-const daylightNoteEl = document.getElementById('daylight-note-text');
 
 function isoToHour(iso) {
   const [hh, mm] = iso.split('T')[1].split(':').map(Number);
@@ -853,7 +905,7 @@ async function loadLiveForecast() {
   const lon = points.map(p => p[1]).join(',');
   const elev = points.map(p => p[2]).join(',');
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
-    `&elevation=${elev}&hourly=temperature_2m,precipitation_probability,windspeed_10m` +
+    `&elevation=${elev}&hourly=temperature_2m,precipitation_probability,windspeed_10m,uv_index` +
     `&daily=sunrise,sunset&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=America%2FDenver` +
     `&start_date=${TRIP_DATE}&end_date=${TRIP_DATE}`;
 
@@ -871,25 +923,23 @@ async function loadLiveForecast() {
   dayRanges = { th: range(liveTh.temperature_2m), hp: range(liveHp.temperature_2m) };
   rebuildWeatherModel();
 
-  let sunriseText = '';
   if (th.daily && th.daily.sunrise && th.daily.sunset) {
-    sunriseText = fmtHour(isoToHour(th.daily.sunrise[0]));
-    sunsetText = fmtHour(isoToHour(th.daily.sunset[0]));
-    if (daylightNoteEl) {
-      daylightNoteEl.innerHTML = `On Oct 9, sunrise is at ${sunriseText} and sunset at ${sunsetText} (per Open-Meteo). The plan above starts at first light and finishes with a comfortable buffer, but if the day runs long the descent is the worst place to lose the light &mdash; bring a headlamp.`;
-    }
+    sunriseHour = isoToHour(th.daily.sunrise[0]);
+    sunsetHour = isoToHour(th.daily.sunset[0]);
   }
+  renderDaylight();
   renderSummary();
   updateTempBadges();
   renderEnergy();
   drawTemp(-1);
-  drawPrecip(-1);
+  drawUv(-1);
 
   if (forecastNoteEl) {
     const pulled = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
     const maxP = Math.round(Math.max(...liveTh.precipitation_probability, ...liveHp.precipitation_probability));
     const maxW = Math.round(Math.max(...liveTh.windspeed_10m, ...liveHp.windspeed_10m));
-    forecastNoteEl.innerHTML = `<strong>Live forecast</strong> pulled from <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> on ${pulled}, sampled directly at the trailhead and at the high point's coordinates/elevation and interpolated by elevation and time of day along the route. For Oct 9: ${Math.round(dayRanges.th[0])}&ndash;${Math.round(dayRanges.th[1])}&deg;F at the trailhead, ${Math.round(dayRanges.hp[0])}&ndash;${Math.round(dayRanges.hp[1])}&deg;F near the crest, up to ${maxP}% precip chance, winds to ${maxW} mph. Cross-check against the <a href="https://forecast.weather.gov/MapClick.php?lat=${peak[0]}&lon=${peak[1]}" target="_blank" rel="noopener">National Weather Service point forecast for the crest</a> and the <a href="https://www.alltrails.com/explore/custom-routes/la-luz-trail-from-sandia-peak-tramway-parking-66f83fb?u=i&amp;sh=se65qt" target="_blank" rel="noopener">AllTrails forecast</a> &mdash; any single model can miss mountain wind and weather. The forecast is pulled fresh every time the page loads, and reverts to the seasonal estimate once Oct 9 has passed.`;
+    const maxUvTop = Math.round(Math.max(...liveTh.uv_index) * uvAltitudeFactor(HP_ELEV_M));
+    forecastNoteEl.innerHTML = `<strong>Live forecast</strong> pulled from <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> on ${pulled}, sampled directly at the trailhead and at the high point's coordinates/elevation and interpolated by elevation and time of day along the route. For Oct 9: ${Math.round(dayRanges.th[0])}&ndash;${Math.round(dayRanges.th[1])}&deg;F at the trailhead, ${Math.round(dayRanges.hp[0])}&ndash;${Math.round(dayRanges.hp[1])}&deg;F near the crest, up to ${maxP}% precip chance, winds to ${maxW} mph, and a midday UV index peaking around ${maxUvTop} near the crest. The UV chart takes Open-Meteo's UV forecast (which doesn't vary with elevation) and adds the <a href="https://www.who.int/news-room/questions-and-answers/item/radiation-the-ultraviolet-(uv)-index" target="_blank" rel="noopener">WHO's rule of thumb</a> of ~10% more UV per 1,000 m of altitude, counted from the trailhead. Cross-check against the <a href="https://forecast.weather.gov/MapClick.php?lat=${peak[0]}&lon=${peak[1]}" target="_blank" rel="noopener">National Weather Service point forecast for the crest</a> and the <a href="https://www.alltrails.com/explore/custom-routes/la-luz-trail-from-sandia-peak-tramway-parking-66f83fb?u=i&amp;sh=se65qt" target="_blank" rel="noopener">AllTrails forecast</a> &mdash; any single model can miss mountain wind and weather. The forecast is pulled fresh every time the page loads, and reverts to the seasonal estimate once Oct 9 has passed.`;
   }
 }
 
@@ -1033,33 +1083,41 @@ trackLine.on('mousemove', function(e) {
 });
 trackLine.on('mouseout', clearHover);
 
-// ---------- Elevation / temperature / precipitation profile ----------
+// ---------- Elevation / temperature / UV profile ----------
 const elevCanvas = document.getElementById('elev-canvas');
 const elevCtx = elevCanvas.getContext('2d');
 const tempCanvas = document.getElementById('temp-canvas');
 const tempCtx = tempCanvas.getContext('2d');
-const precipCanvas = document.getElementById('precip-canvas');
-const precipCtx = precipCanvas.getContext('2d');
+const uvCanvas = document.getElementById('uv-canvas');
+const uvCtx = uvCanvas.getContext('2d');
 const profileWrap = document.getElementById('profile-wrap');
 const profileFooter = document.getElementById('profile-footer');
 
 function resizeCanvas() {
-  [elevCanvas, tempCanvas, precipCanvas].forEach(c => {
+  [elevCanvas, tempCanvas, uvCanvas].forEach(c => {
     const rect = c.getBoundingClientRect();
     c.width = rect.width * devicePixelRatio;
     c.height = rect.height * devicePixelRatio;
   });
   drawElevation(-1);
   drawTemp(-1);
-  drawPrecip(-1);
+  drawUv(-1);
 }
+
+// Horizontal plot padding in CSS px, shared with indexFromClientX() so
+// hover/scrub positions line up with the plotted line.
+const PLOT_PAD_L = 8, PLOT_PAD_R = 8;
 
 function drawSeries(ctx, canvas, values, valMin, valMax, hoverIndex, opts) {
   const w = canvas.width, h = canvas.height;
   ctx.clearRect(0, 0, w, h);
-  const padL = 8 * devicePixelRatio, padR = 8 * devicePixelRatio;
-  const padT = 10 * devicePixelRatio;
-  const padB = 28 * devicePixelRatio;
+  const padL = PLOT_PAD_L * devicePixelRatio, padR = PLOT_PAD_R * devicePixelRatio;
+  // Tight vertical padding: just enough for the line width and the up/down
+  // bar. The .profile-label titles overlay the top-left
+  // corner instead of getting their own band, since every series here
+  // starts low on the left (trailhead, morning) and peaks further right.
+  const padT = 8 * devicePixelRatio;
+  const padB = 10 * devicePixelRatio;
   const plotW = w - padL - padR, plotH = h - padT - padB;
   const range = (valMax - valMin) || 1;
 
@@ -1096,24 +1154,6 @@ function drawSeries(ctx, canvas, values, valMin, valMax, hoverIndex, opts) {
     ctx.stroke();
   });
 
-  // Dashed marker at the turnaround (tram top).
-  ctx.save();
-  ctx.setLineDash([4 * devicePixelRatio, 4 * devicePixelRatio]);
-  ctx.beginPath();
-  ctx.moveTo(xAt(turnIdx), padT);
-  ctx.lineTo(xAt(turnIdx), padT + plotH);
-  ctx.strokeStyle = 'rgba(43,42,39,0.25)';
-  ctx.lineWidth = 1 * devicePixelRatio;
-  ctx.stroke();
-  ctx.restore();
-  if (opts.turnLabel) {
-    ctx.fillStyle = '#918b7c';
-    ctx.font = `${10.5 * devicePixelRatio}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.fillText('Tram top', xAt(turnIdx), padT + plotH + 18 * devicePixelRatio);
-    ctx.textAlign = 'left';
-  }
-
   if (hoverIndex >= 0) {
     const x = xAt(hoverIndex), y = yAt(hoverIndex);
     ctx.beginPath();
@@ -1132,8 +1172,7 @@ function drawSeries(ctx, canvas, values, valMin, valMax, hoverIndex, opts) {
 function drawElevation(hoverIndex) {
   drawSeries(elevCtx, elevCanvas, track.map(p => p[2]), minEle, maxEle, hoverIndex, {
     fill: 'rgba(52,73,94,0.14)',
-    stroke: '#34495e',
-    turnLabel: true
+    stroke: '#34495e'
   });
 }
 
@@ -1145,19 +1184,19 @@ function drawTemp(hoverIndex) {
   });
 }
 
-function drawPrecip(hoverIndex) {
+function drawUv(hoverIndex) {
   if (!liveTh) {
-    precipCtx.clearRect(0, 0, precipCanvas.width, precipCanvas.height);
-    precipCtx.fillStyle = '#918b7c';
-    precipCtx.font = `${12.5 * devicePixelRatio}px sans-serif`;
-    precipCtx.textAlign = 'center';
-    precipCtx.fillText('Precipitation forecast unavailable', precipCanvas.width / 2, precipCanvas.height / 2);
-    precipCtx.textAlign = 'left';
+    uvCtx.clearRect(0, 0, uvCanvas.width, uvCanvas.height);
+    uvCtx.fillStyle = '#918b7c';
+    uvCtx.font = `${12.5 * devicePixelRatio}px sans-serif`;
+    uvCtx.textAlign = 'center';
+    uvCtx.fillText('UV forecast unavailable', uvCanvas.width / 2, uvCanvas.height / 2);
+    uvCtx.textAlign = 'left';
     return;
   }
-  drawSeries(precipCtx, precipCanvas, precipAtPoint, 0, maxPrecip, hoverIndex, {
-    fill: 'rgba(52,152,219,0.16)',
-    stroke: '#3498db'
+  drawSeries(uvCtx, uvCanvas, uvAtPoint, 0, maxUv, hoverIndex, {
+    fill: 'rgba(142,68,173,0.14)',
+    stroke: '#8e44ad'
   });
 }
 
@@ -1167,8 +1206,8 @@ function showHover(idx) {
   hoverMarker.setOpacity(1);
   drawElevation(idx);
   drawTemp(idx);
-  drawPrecip(idx);
-  const liveTxt = liveTh ? ` · ${Math.round(precipAtPoint[idx])}% precip · ${Math.round(windAtPoint[idx])} mph wind` : '';
+  drawUv(idx);
+  const liveTxt = liveTh ? ` · UV ${Math.round(uvAtPoint[idx])} (${uvCategory(uvAtPoint[idx])}) · ${Math.round(windAtPoint[idx])} mph wind` : '';
   profileFooter.textContent = `${(cumDist[idx]/1609.34).toFixed(2)} mi · ${Math.round(p[2]*3.28084).toLocaleString()} ft · ${Math.round(tempAtPoint[idx])}°F${liveTxt} · ${fmtHour(hourAtPoint[idx])}`;
 }
 
@@ -1176,13 +1215,13 @@ function clearHover() {
   hoverMarker.setOpacity(0);
   drawElevation(-1);
   drawTemp(-1);
-  drawPrecip(-1);
+  drawUv(-1);
   profileFooter.textContent = '';
 }
 
 function indexFromClientX(clientX) {
-  const rect = profileWrap.getBoundingClientRect();
-  const x = (clientX - rect.left) / rect.width;
+  const rect = elevCanvas.getBoundingClientRect();
+  const x = Math.max(0, Math.min(1, (clientX - rect.left - PLOT_PAD_L) / (rect.width - PLOT_PAD_L - PLOT_PAD_R)));
   const targetDist = x * totalDist;
   let lo = 0, hi = cumDist.length - 1;
   while (lo < hi) {
