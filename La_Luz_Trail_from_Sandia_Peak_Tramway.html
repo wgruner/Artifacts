@@ -44,7 +44,6 @@
     --chart-uv-stroke: #8e44ad;
     --chart-uv-fill: rgba(142,68,173,0.14);
     --chart-hover: rgba(43,42,39,0.4);
-    --image-filter: none;
     --radius: 14px;
     --radius-sm: 9px;
     --shadow: 0 2px 10px rgba(60, 50, 30, 0.08), 0 1px 2px rgba(60, 50, 30, 0.06);
@@ -74,7 +73,6 @@
       --chart-uv-stroke: #c39bd3;
       --chart-uv-fill: rgba(195,155,211,0.16);
       --chart-hover: rgba(236,230,224,0.45);
-      --image-filter: brightness(0.88);
       --shadow: 0 2px 10px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.3);
     }
   }
@@ -102,7 +100,6 @@
     --chart-uv-stroke: #c39bd3;
     --chart-uv-fill: rgba(195,155,211,0.16);
     --chart-hover: rgba(236,230,224,0.45);
-    --image-filter: brightness(0.88);
     --shadow: 0 2px 10px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.3);
   }
   * { box-sizing: border-box; }
@@ -361,14 +358,56 @@
     line-height: 1.4;
     margin-bottom: 10px;
   }
-  .gear-image {
-    display: block;
-    max-width: 100%;
-    border: 1px solid var(--line);
-    border-radius: var(--radius-sm);
-    cursor: zoom-in;
-    filter: var(--image-filter);
+  .checklist-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
   }
+  .checklist-group {
+    flex: 1 1 220px;
+    padding: 8px 11px;
+    border-radius: var(--radius-sm);
+    background: var(--paper);
+    border-left: 3px solid var(--line);
+  }
+  .checklist-title {
+    font-weight: 700;
+    color: var(--ink);
+    font-size: 0.85rem;
+    margin-bottom: 4px;
+  }
+  .checklist-group label {
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    font-size: 0.8rem;
+    line-height: 1.35;
+    color: var(--muted);
+    padding: 3px 0;
+    cursor: pointer;
+  }
+  .checklist-group input {
+    margin: 2px 0 0;
+    flex-shrink: 0;
+    accent-color: var(--accent);
+  }
+  .checklist-group label:has(input:checked) {
+    text-decoration: line-through;
+    text-decoration-color: var(--muted);
+    opacity: 0.7;
+  }
+  .checklist-reset {
+    margin-top: 10px;
+    background: none;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font: inherit;
+    font-size: 0.75rem;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .checklist-reset:hover { color: var(--ink); }
 
   #trail-notes {
     flex-shrink: 0;
@@ -406,14 +445,14 @@
     font-size: 0.8rem;
     line-height: 1.4;
   }
-  .note-text a, .energy-intro a, .itin-stats a {
+  .note-text a, .energy-intro a, .itin-stats a, .gear-intro a {
     color: var(--accent-dark);
     font-weight: 600;
     text-decoration: underline;
     text-decoration-color: var(--line);
     text-underline-offset: 2px;
   }
-  .note-text a:hover, .energy-intro a:hover, .itin-stats a:hover {
+  .note-text a:hover, .energy-intro a:hover, .itin-stats a:hover, .gear-intro a:hover {
     text-decoration-color: currentColor;
   }
   /* In-page jump target (from the Down card): leave some room above it and
@@ -523,6 +562,8 @@
     #energy-body .itin-day { flex-basis: 100%; padding: 6px 8px; }
     #gear-card { padding: 10px 12px; }
     .gear-intro { font-size: 0.8rem; }
+    .checklist-grid { gap: 7px; }
+    .checklist-group { flex-basis: 100%; padding: 6px 8px; }
     #trail-notes { padding: 10px 12px; }
     .notes-grid { gap: 7px; }
     .note-item { flex-basis: 100%; padding: 6px 8px; }
@@ -615,10 +656,40 @@
   </div>
   <div id="gear-card">
     <h2>Gear</h2>
-    <div class="gear-intro">The Day Hike column of the checklist below (from Pam Neely's Santa Fe to Taos Trail guide) covers this one well. For La Luz specifically, add trekking poles for the long rocky descent, a warm layer and windbreaker for the top (it's typically 15&ndash;20&deg;F colder up there than at the car), sun protection for the exposed lower half, and a headlamp in case the descent runs late.</div>
-    <a href="SF2T_Gear_Checklist.png">
-      <img src="SF2T_Gear_Checklist.png" alt="Recommended gear checklist for a day hike and one- or two-night overnight, from Pam Neely's Santa Fe to Taos Trail guide" class="gear-image">
-    </a>
+    <div class="gear-intro">A day-hike checklist for La Luz, drawn from the day-hike list in Pam Neely's Santa Fe to Taos Trail guide and cross-checked against <a href="https://www.rei.com/learn/expert-advice/day-hiking-checklist.html" target="_blank" rel="noopener">REI's day hiking checklist</a>, trimmed to what this hike actually needs. No water filter (there's no water on the trail to treat) and no bear spray. Checks are saved in this browser.</div>
+    <div class="checklist-grid">
+      <div class="checklist-group">
+        <div class="checklist-title">Pack, water &amp; food</div>
+        <label><input type="checkbox" data-gear="pack"> Daypack (~20&nbsp;L)</label>
+        <label><input type="checkbox" data-gear="water"> All your water for the day, in a bladder and/or bottles &mdash; see Energy &amp; Hydration for how much</label>
+        <label><input type="checkbox" data-gear="food"> Lunch, high-energy snacks, and electrolytes</label>
+      </div>
+      <div class="checklist-group">
+        <div class="checklist-title">Clothing &amp; footwear</div>
+        <label><input type="checkbox" data-gear="boots"> Broken-in, ankle-high hiking boots</label>
+        <label><input type="checkbox" data-gear="pants"> Long trekking pants</label>
+        <label><input type="checkbox" data-gear="sun-hoodie"> Wicking sun hoodie (hood and long sleeves block the sun)</label>
+        <label><input type="checkbox" data-gear="socks"> Wool or synthetic socks, plus a spare pair</label>
+        <label><input type="checkbox" data-gear="spare-top"> Spare dry top to change into at the top</label>
+        <label><input type="checkbox" data-gear="layers"> Warm layer (fleece or light puffy) and a wind shell</label>
+        <label><input type="checkbox" data-gear="hat-gloves"> Warm hat and light gloves, for the top and any tram wait</label>
+      </div>
+      <div class="checklist-group">
+        <div class="checklist-title">Sun &amp; first aid</div>
+        <label><input type="checkbox" data-gear="sun"> Visor, sunglasses, SPF&nbsp;50 sunscreen, SPF lip balm</label>
+        <label><input type="checkbox" data-gear="first-aid"> First-aid kit with blister care and pain reliever</label>
+        <label><input type="checkbox" data-gear="hygiene"> Toilet paper, a zip bag to pack it out, hand sanitizer</label>
+      </div>
+      <div class="checklist-group">
+        <div class="checklist-title">Navigation &amp; safety</div>
+        <label><input type="checkbox" data-gear="phone"> Charged phone with the route downloaded offline, plus a small battery pack</label>
+        <label><input type="checkbox" data-gear="headlamp"> Headlamp for each person</label>
+        <label><input type="checkbox" data-gear="poles"> Trekking poles</label>
+        <label><input type="checkbox" data-gear="emergency"> Emergency blanket or bivy, and a whistle</label>
+        <label><input type="checkbox" data-gear="id-card"> ID and a card for one-way tram tickets</label>
+      </div>
+    </div>
+    <button type="button" class="checklist-reset" id="checklist-reset">Clear checks</button>
   </div>
   <div id="trail-notes">
     <h2>Trail Notes</h2>
@@ -628,12 +699,12 @@
         <div class="note-text" id="forecast-note-text">Until the live forecast loads, temperatures on this page are a rough seasonal estimate for early October: about 44&ndash;68&deg;F at the trailhead (~6,500 ft) and 34&ndash;52&deg;F near the crest (~10,600 ft), interpolated by elevation and by time of day along the hike. <em>(Loading a live forecast now&hellip;)</em></div>
       </div>
       <div class="note-item" id="tram-note">
-        <div class="note-label">Riding the tram down instead</div>
-        <div class="note-text">The route ends at the tram's upper terminal, so you can skip the descent and ride down to your car instead &mdash; it cuts the day roughly in half and spares your knees the steep, rocky descent. Hike-up, ride-down is a standard option the tram <a href="https://sandiapeak.com/hiking/" target="_blank" rel="noopener">explicitly supports</a>, with one-way tickets (about $24 at last check). Hikers can usually buy one at the upper terminal when they arrive, but don't count on that this time: Oct 9 falls during the <a href="https://balloonfiesta.com/" target="_blank" rel="noopener">Balloon Fiesta</a> (Oct 3&ndash;11, 2026), when the tram says it expects to sell out and warns of 1&ndash;2 hour waits. <strong>Buy one-way tickets online ahead of time</strong> &mdash; they go on sale 30 days out, so they're available now. If checkout asks you to pick a departure time, choose one with some slack after your estimated arrival at the top, and check whether it can be changed. The tram is closed Tuesdays (Oct 9 is a Friday) and runs weather permitting &mdash; high winds can shut it down, so have a plan to hike down anyway. <a href="https://sandiapeak.com/aerial-tram-tickets/" target="_blank" rel="noopener">Buy tickets at sandiapeak.com</a>.</div>
+        <div class="note-label">Getting down: plans A, B &amp; C</div>
+        <div class="note-text"><strong>Plan A &mdash; ride the tram down.</strong> The route ends at the tram's upper terminal, and hike-up, ride-down is a standard option the tram <a href="https://sandiapeak.com/hiking/" target="_blank" rel="noopener">explicitly supports</a>, with one-way tickets (about $24 at last check). Sandia Peak Tramway confirmed by phone on Oct 3 that you can buy one-way tickets down at the top, last minute, on Friday &mdash; no need to buy online ahead of time, despite the <a href="https://balloonfiesta.com/" target="_blank" rel="noopener">Balloon Fiesta</a> crowds. Getting people off the mountain is a priority for them, but there may be a wait of a few hours for a car down. The tram also runs weather permitting; high winds can shut it down. <a href="https://sandiapeak.com/aerial-tram-tickets/" target="_blank" rel="noopener">Tickets &amp; hours at sandiapeak.com</a>.<br><br><strong>Plan B &mdash; hike back down La Luz.</strong> The full out-and-back this page plans for; the start time is set so it finishes before sunset (see the Down card at the top for how much margin that leaves).<br><br><strong>Plan C &mdash; hike down to the 10K Trailhead for a pickup.</strong> If the tram falls through and nobody's up for the whole descent, take the King of the Mountain Trail to the 10K Trail (South) and down to the 10K Trailhead parking lot on NM&nbsp;536, where you can get a ride if you need one. Those trails are open, and the 10K <em>north</em> lot is fully open with restrooms (as of Oct 3), so a driver can park there and wait.</div>
       </div>
       <div class="note-item">
         <div class="note-label">Water &amp; sun</div>
-        <div class="note-text">There's no reliable water anywhere on La Luz &mdash; carry everything you'll need from the start (see Energy &amp; Hydration above). The lower half climbs through open, south- and west-facing desert scrub with very little shade, and you'll be coming back down through it in the late afternoon, when the lower switchbacks can be far warmer than the forecast at the top suggests. UV peaks around midday, while you're on the upper climb (and getting the most of the altitude boost shown in the UV chart), and the cool air up there makes it easy to forget &mdash; sunscreen, a hat, and sunglasses. The upper terminal and the restaurant at the top are possible places to buy a drink, but don't count on them.</div>
+        <div class="note-text">There's no reliable water anywhere on La Luz &mdash; carry everything you'll need from the start (see Energy &amp; Hydration above). The lower half climbs through open, south- and west-facing desert scrub with very little shade, and you'll be coming back down through it in the late afternoon, when the lower switchbacks can be far warmer than the forecast at the top suggests. UV peaks around midday, while you're on the upper climb (and getting the most of the altitude boost shown in the UV chart), and the cool air up there makes it easy to forget &mdash; a sun hoodie and visor, sunscreen, and sunglasses. The upper terminal and the restaurant at the top are possible places to buy a drink, but don't count on them.</div>
       </div>
       <div class="note-item">
         <div class="note-label">Terrain &amp; pace</div>
@@ -641,11 +712,11 @@
       </div>
       <div class="note-item">
         <div class="note-label">Cold, wind &amp; altitude at the top</div>
-        <div class="note-text">The route gains roughly 4,000 ft from the parking lot to the high point (~10,650 ft) near the top of La Luz. Expect the crest to be noticeably colder and windier than the trailhead, and October can bring the first snow or ice to the shaded upper switchbacks &mdash; if a storm passes through in the days before, check recent AllTrails reviews for conditions. Altitude can also make the upper climb feel harder than the numbers suggest, especially for anyone coming from low elevation.</div>
+        <div class="note-text">The route rises about 4,100 ft from the parking lot (6,517 ft) to the high point (10,646 ft) near the top of La Luz &mdash; about 4,350 ft of total climbing once the ups and downs along the way are counted. Expect the crest to be noticeably colder and windier than the trailhead, and October can bring the first snow or ice to the shaded upper switchbacks &mdash; if a storm passes through in the days before, check recent AllTrails reviews for conditions. Altitude can also make the upper climb feel harder than the numbers suggest, especially for anyone coming from low elevation.</div>
       </div>
       <div class="note-item">
         <div class="note-label">Daylight</div>
-        <div class="note-text" id="daylight-note-text">On Oct 9, sunrise is around 7:07 AM and sunset around 6:38 PM in Albuquerque. The plan above starts at first light and finishes with a comfortable buffer, but if the day runs long the descent is the worst place to lose the light &mdash; bring a headlamp.</div>
+        <div class="note-text" id="daylight-note-text">On Oct 9, sunrise is around 7:07 AM and sunset around 6:38 PM in Albuquerque. If the day runs long, the descent is the worst place to lose the light &mdash; bring a headlamp.</div>
       </div>
       <div class="note-item">
         <div class="note-label">Wildlife</div>
@@ -653,7 +724,7 @@
       </div>
       <div class="note-item">
         <div class="note-label">Trail status &amp; closures</div>
-        <div class="note-text">La Luz is in the Sandia Mountain Wilderness, managed by the Sandia Ranger District of Cibola National Forest. Check <a href="https://www.fs.usda.gov/cibola/alerts" target="_blank" rel="noopener">Cibola NF alerts</a> before heading out for any fire restrictions, closures, or trail damage, and check <a href="https://sandiapeak.com/" target="_blank" rel="noopener">sandiapeak.com</a> for the tram's status the morning of.</div>
+        <div class="note-text">La Luz is in the Sandia Mountain Wilderness, managed by the Sandia Ranger District of Cibola National Forest. The Sandia Crest area itself is <a href="https://www.fs.usda.gov/r03/cibola/alerts/area-closure-sandia-crest-switchback-hazard-tree-and-fuel-reduction-project" target="_blank" rel="noopener">closed for a Forest Service project</a> through Jan 15, 2027 &mdash; including the Crest Spur from La Luz to the Crest House and NM&nbsp;536 beyond the 10K Trailhead &mdash; but La Luz up to the tram, King of the Mountain, and the 10K Trail (South) are open, so the route and all three plans for getting down are unaffected. Check <a href="https://www.fs.usda.gov/cibola/alerts" target="_blank" rel="noopener">Cibola NF alerts</a> before heading out for any fire restrictions, closures, or trail damage, and check <a href="https://sandiapeak.com/" target="_blank" rel="noopener">sandiapeak.com</a> for the tram's status the morning of.</div>
       </div>
     </div>
   </div>
@@ -843,7 +914,7 @@ const trackLine = L.polyline(latlngs, {
 // same model as the Agua Piedra page. Lands at ~9.5 hr for the round trip,
 // in line with AllTrails' own 9–10 hr estimate.
 const TRIP_DATE = '2026-10-09';
-const START_HOUR = 9;          // 9 AM
+const START_HOUR = 8;          // 8 AM, leaves daylight to hike back down if the tram falls through
 const TOP_BREAK_HR = 0.5;      // rest/lunch at the tram's upper terminal
 const PACE_MPH = 2.0;
 const CLIMB_HR_PER_M = 1 / 609.6;
@@ -907,7 +978,7 @@ function sunsetPhrase() {
 function renderDaylight() {
   const el = document.getElementById('daylight-note-text');
   if (!el) return;
-  el.innerHTML = `On Oct 9, sunrise is at ${fmtHour(sunriseHour)} and sunset at ${fmtHour(sunsetHour)}. With a ${fmtHourNatural(START_HOUR)} start, hiking back down puts you at the car around ${fmtHourNatural(finishHour)}, ${sunsetPhrase()}. Riding the tram down instead (from the top around ${fmtHourNatural(topHour)}) avoids the issue entirely.${sunsetHour - finishHour >= 1.5 ? " Either way, the descent is the worst place to lose the light &mdash; bring a headlamp." : ""}`;
+  el.innerHTML = `On Oct 9, sunrise is at ${fmtHour(sunriseHour)} and sunset at ${fmtHour(sunsetHour)}. Starting at ${fmtHourNatural(START_HOUR)}, hiking back down puts you at the car around ${fmtHourNatural(finishHour)}, ${sunsetPhrase()}. Riding the tram down instead (from the top around ${fmtHourNatural(topHour)}) keeps you off the trail at dusk even with a wait of a few hours.${sunsetHour - finishHour >= 1.5 ? " Either way, the descent is the worst place to lose the light &mdash; bring a headlamp." : ""}`;
 }
 
 function renderSummary() {
@@ -919,7 +990,7 @@ function renderSummary() {
     </div>
     <div class="itin-day itin-down">
       <div class="itin-label">Down<span class="itin-temp" id="temp-badge-down"></span></div>
-      <div class="itin-stats">After a ${Math.round(TOP_BREAK_HR * 60)}-minute break at the top (${ft(turn[2])}), retracing the route gets you back to the car (${ft(start[2])}) around ${fmtHourNatural(finishHour)}, ${sunsetPhrase()}. Or <a href="#tram-note">ride the tram down</a> instead and be back by mid-afternoon &mdash; buy tickets ahead, since Oct 9 is during Balloon Fiesta.</div>
+      <div class="itin-stats">After a ${Math.round(TOP_BREAK_HR * 60)}-minute break at the top (${ft(turn[2])}), retracing the route gets you back to the car (${ft(start[2])}) around ${fmtHourNatural(finishHour)}, ${sunsetPhrase()}. That's plan B &mdash; plan A is to <a href="#tram-note">ride the tram down</a> (tickets at the top, though the wait could be a few hours), and plan C is a pickup at the 10K Trailhead.</div>
     </div>
     <div class="itin-day itin-totals">
       <div class="itin-label">Totals</div>
@@ -1145,7 +1216,7 @@ async function loadLiveForecast() {
     const maxP = Math.round(Math.max(...liveTh.precipitation_probability, ...liveHp.precipitation_probability));
     const maxW = Math.round(Math.max(...liveTh.windspeed_10m, ...liveHp.windspeed_10m));
     const maxUvTop = Math.round(Math.max(...liveTh.uv_index) * uvAltitudeFactor(HP_ELEV_M));
-    forecastNoteEl.innerHTML = `<strong>Live forecast</strong> pulled from <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> on ${pulled}, sampled directly at the trailhead and at the high point's coordinates/elevation and interpolated by elevation and time of day along the route. For Oct 9: ${Math.round(dayRanges.th[0])}&ndash;${Math.round(dayRanges.th[1])}&deg;F at the trailhead, ${Math.round(dayRanges.hp[0])}&ndash;${Math.round(dayRanges.hp[1])}&deg;F near the crest, up to ${maxP}% precip chance, winds to ${maxW} mph, and a midday UV index peaking around ${maxUvTop} near the crest. The UV chart takes Open-Meteo's UV forecast (which doesn't vary with elevation) and adds the <a href="https://www.who.int/news-room/questions-and-answers/item/radiation-the-ultraviolet-(uv)-index" target="_blank" rel="noopener">WHO's rule of thumb</a> of ~10% more UV per 1,000 m of altitude, counted from the trailhead. Cross-check against the <a href="https://forecast.weather.gov/MapClick.php?lat=${peak[0]}&lon=${peak[1]}" target="_blank" rel="noopener">National Weather Service point forecast for the crest</a> and the <a href="https://www.alltrails.com/explore/custom-routes/la-luz-trail-from-sandia-peak-tramway-parking-66f83fb?u=i&amp;sh=se65qt" target="_blank" rel="noopener">AllTrails forecast</a> &mdash; any single model can miss mountain wind and weather. The forecast is pulled fresh every time the page loads, and reverts to the seasonal estimate once Oct 9 has passed.`;
+    forecastNoteEl.innerHTML = `<strong>Live forecast</strong> pulled from <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> on ${pulled}, sampled directly at the trailhead and at the high point's coordinates/elevation and interpolated by elevation and time of day along the route. For Oct 9: ${Math.round(dayRanges.th[0])}&ndash;${Math.round(dayRanges.th[1])}&deg;F at the trailhead, ${Math.round(dayRanges.hp[0])}&ndash;${Math.round(dayRanges.hp[1])}&deg;F near the crest, ${maxP === 0 ? 'no rain in the forecast' : `up to a ${maxP}% chance of rain`}, winds to ${maxW} mph, and a midday UV index peaking around ${maxUvTop} near the crest. The UV chart takes Open-Meteo's UV forecast (which doesn't vary with elevation) and adds the <a href="https://www.who.int/news-room/questions-and-answers/item/radiation-the-ultraviolet-(uv)-index" target="_blank" rel="noopener">WHO's rule of thumb</a> of ~10% more UV per 1,000 m of altitude, counted from the trailhead. Cross-check against the <a href="https://forecast.weather.gov/MapClick.php?lat=${peak[0]}&lon=${peak[1]}" target="_blank" rel="noopener">National Weather Service point forecast for the crest</a> and the <a href="https://www.alltrails.com/explore/custom-routes/la-luz-trail-from-sandia-peak-tramway-parking-66f83fb?u=i&amp;sh=se65qt" target="_blank" rel="noopener">AllTrails forecast</a> &mdash; any single model can miss mountain wind and weather. The forecast is pulled fresh every time the page loads, and reverts to the seasonal estimate once Oct 9 has passed.`;
   }
 }
 
@@ -1416,6 +1487,29 @@ function drawUv(hoverIndex) {
     stroke: chartColors.uvStroke
   });
 }
+
+// ---------- Gear checklist ----------
+// Checked items are remembered in this browser only (a packing aid, not
+// shared state). Storage can be unavailable, so every access is guarded.
+const GEAR_KEY = 'la-luz-gear';
+const gearBoxes = document.querySelectorAll('[data-gear]');
+let gearChecked = {};
+try { gearChecked = JSON.parse(localStorage.getItem(GEAR_KEY)) || {}; } catch (e) { gearChecked = {}; }
+function saveGear() {
+  try { localStorage.setItem(GEAR_KEY, JSON.stringify(gearChecked)); } catch (e) { /* not persisted */ }
+}
+gearBoxes.forEach(box => {
+  box.checked = !!gearChecked[box.dataset.gear];
+  box.addEventListener('change', () => {
+    if (box.checked) gearChecked[box.dataset.gear] = true; else delete gearChecked[box.dataset.gear];
+    saveGear();
+  });
+});
+document.getElementById('checklist-reset').addEventListener('click', () => {
+  gearChecked = {};
+  gearBoxes.forEach(box => { box.checked = false; });
+  saveGear();
+});
 
 // ---------- Light / dark theme switch ----------
 // Three choices: follow the system (default, nothing saved), or force light
