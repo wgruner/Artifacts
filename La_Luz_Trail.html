@@ -726,7 +726,7 @@
   </div>
   <div id="energy-card">
     <h2>Energy &amp; Hydration</h2>
-    <div class="energy-intro">Estimated for a 170&nbsp;lb reference hiker with a ~15&nbsp;lb day pack, using the <a href="https://en.wikipedia.org/wiki/Pandolf_equation" target="_blank" rel="noopener">Pandolf load-carriage equation</a> applied to this route's actual grade (descents counted as level walking, since Pandolf alone overstates how much downhill saves on rough trail), and a <a href="https://www.rei.com/learn/expert-advice/hydrate.html" target="_blank" rel="noopener">wilderness-medicine&ndash;style hydration baseline</a> (0.5 L/hr moderate pace, +25% on sustained steep climbs, +0.1 L/hr above 8,000&nbsp;ft and again in temperatures above 70&deg;F). Heavier or lighter hikers should scale up or down accordingly.</div>
+    <div class="energy-intro">Estimated for a 170&nbsp;lb reference hiker with a ~15&nbsp;lb day pack, using the <a href="https://en.wikipedia.org/wiki/Pandolf_equation" target="_blank" rel="noopener">Pandolf load-carriage equation</a> applied to this route's actual grade (descents counted as level walking, since Pandolf alone overstates how much downhill saves on rough trail) with a rough-terrain factor of 1.5, since <a href="https://academic.oup.com/milmed/article/183/9-10/e357/5025891" target="_blank" rel="noopener">a study of load carriage over complex terrain</a> found these equations tend to underestimate real effort, and a <a href="https://www.rei.com/learn/expert-advice/hydrate.html" target="_blank" rel="noopener">wilderness-medicine&ndash;style hydration baseline</a> (0.5 L/hr moderate pace, +25% on sustained steep climbs, +0.1 L/hr above 8,000&nbsp;ft and again in temperatures above 70&deg;F). Heavier or lighter hikers should scale up or down accordingly.</div>
     <div id="energy-body"></div>
   </div>
   <div id="gear-card">
@@ -783,7 +783,7 @@
       </div>
       <div class="note-item">
         <div class="note-label">Terrain &amp; pace</div>
-        <div class="note-text">La Luz is well-marked and easy to follow, averaging about a 9% grade with few level spots to catch your breath. Long stretches are loose decomposed granite, and higher up the trail crosses a talus field known as &ldquo;the rockslide,&rdquo; where the footing is difficult. The upper sections are narrow, alongside a steep drop. The last mile or so traverses south along the upper slopes to the tram terminal, at about 10,100&ndash;10,300&nbsp;ft. Stay on the switchbacks rather than cutting corners.<br><br>Coming down is easier on the lungs but harder on the legs. In one lab study, peak knee-joint force walking down a 24&deg; slope was about 7&times; body weight, versus about 4.6&times; walking up the same slope (<a href="https://isbweb.org/images/conf/2001/Longabstracts/PDF/0800_0899/0807.pdf" target="_blank" rel="noopener">Schwameder et al.</a>). The quads also do braking work that builds fatigue and soreness over a long descent. Trekking poles <a href="https://www.researchgate.net/publication/12692643_Knee_joint_forces_during_downhill_walking_with_hiking_poles" target="_blank" rel="noopener">cut knee loads by about 12&ndash;25%</a>. Loose rock and talus slow a descent more than any pace formula predicts, so budget extra time if you hike down.</div>
+        <div class="note-text">La Luz is well-marked and easy to follow, averaging about a 9% grade with few level spots to catch your breath. Long stretches are loose decomposed granite, and higher up the trail crosses a talus field known as &ldquo;the rockslide,&rdquo; where the footing is difficult. The upper sections are narrow, alongside a steep drop. The last mile or so traverses south along the upper slopes to the tram terminal, at about 10,100&ndash;10,300&nbsp;ft. Stay on the switchbacks rather than cutting corners.<br><br>Coming down is easier on the lungs but harder on the legs. In one lab study, peak knee-joint force walking down a 24&deg; slope was about 7&times; body weight, versus about 4.6&times; walking up the same slope (<a href="https://isbweb.org/images/conf/2001/Longabstracts/PDF/0800_0899/0807.pdf" target="_blank" rel="noopener">Schwameder et al.</a>). The quads also do braking work that builds fatigue and soreness over a long descent. Trekking poles <a href="https://www.researchgate.net/publication/12692643_Knee_joint_forces_during_downhill_walking_with_hiking_poles" target="_blank" rel="noopener">cut knee loads by about 12&ndash;25%</a>. The timeline on this page already gives the descent more time than the classic rule of thumb would: it splits the day's hiking time between up and down using a <a href="https://arxiv.org/abs/2303.16065" target="_blank" rel="noopener">walking-speed model built from about 88,000 km of real GPS hiking tracks</a>, which found hikers climb faster and descend slower than that rule assumes. Loose rock and talus can slow a descent further still, so budget extra time if you hike down.</div>
       </div>
       <div class="note-item">
         <div class="note-label">Cold, wind &amp; altitude at the top</div>
@@ -1089,17 +1089,50 @@ L.polyline(OPT_START.path, {
 }).addTo(map);
 
 // ---------- Pace model ----------
-// 2.0 mph baseline + Naismith's rule (+1 hr per 2,000 ft of ascent), the
-// same model as the Agua Piedra page. Lands at ~9.5 hr for the round trip,
-// in line with AllTrails' own 9–10 hr estimate.
+// Total moving time: 2.0 mph baseline + Naismith's rule (+1 hr per 2,000 ft
+// of ascent), ~9.6 hr for the round trip, in line with AllTrails' 8.5–9 hr
+// estimate for La Luz. But Naismith gets the split wrong: from ~88,000 km of
+// real GPS hiking tracks, Wood et al. (2023, https://arxiv.org/abs/2303.16065)
+// found it overestimates climbing time and underestimates descending time,
+// with the errors largely cancelling over a whole hike. So the total stays
+// Naismith's, and each segment's share of it comes from their walking-speed
+// model: v (km/h) = exp(a + b·hill + c·walk + d·walk²), slopes in degrees,
+// unpaved-road coefficients. Hill slope (the terrain's own gradient) is
+// approximated by the trail's grade, a lower bound on switchbacks.
+// (The optional start's connector still uses plain Naismith; it has no
+// per-point elevations to split.)
 const TRIP_DATE = '2026-10-09';
 const START_HOUR = 8;          // 8 AM, leaves daylight to hike back down if the tram falls through
 const TOP_BREAK_HR = 0.5;      // rest/lunch at the tram's upper terminal
 const PACE_MPH = 2.0;
 const CLIMB_HR_PER_M = 1 / 609.6;
+const WOOD_UNPAVED = { a: 1.580, b: -0.00389, c: -0.00965, d: -0.00248 };
 
-const hourAtPoint = track.map((p, i) =>
-  START_HOUR + (cumDist[i] / 1609.34) / PACE_MPH + climbAt[i] * CLIMB_HR_PER_M + (i > turnIdx ? TOP_BREAK_HR : 0));
+// Hours to walk from point i-1 to point i (segHrs[0] = 0), excluding the break.
+const segHrs = (() => {
+  const ele = smoothElevation(100);
+  const { a, b, c, d } = WOOD_UNPAVED;
+  const shape = [0], naismith = [0];
+  for (let i = 1; i < track.length; i++) {
+    const dist = cumDist[i] - cumDist[i-1];
+    naismith.push((dist / 1609.34) / PACE_MPH + (climbAt[i] - climbAt[i-1]) * CLIMB_HR_PER_M);
+    if (dist <= 0) { shape.push(0); continue; }
+    const walk = Math.atan((ele[i] - ele[i-1]) / dist) * 180 / Math.PI;
+    const v = Math.exp(a + b * Math.abs(walk) + c * walk + d * walk * walk);
+    shape.push((dist / 1000) / v);
+  }
+  const scale = naismith.reduce((s, h) => s + h, 0) / shape.reduce((s, h) => s + h, 0);
+  return shape.map(h => h * scale);
+})();
+
+const hourAtPoint = (() => {
+  let t = START_HOUR;
+  return track.map((p, i) => {
+    if (i > 0) t += segHrs[i];
+    if (i === turnIdx + 1) t += TOP_BREAK_HR;
+    return t;
+  });
+})();
 const topHour = hourAtPoint[turnIdx];
 const finishHour = hourAtPoint[track.length - 1];
 
@@ -1334,10 +1367,8 @@ const displayEleMin = Math.min(...displayEle), displayEleMax = Math.max(...displ
 // chart — precision no forecast actually has.
 const weatherEle = gaussSmooth(track.map(p => p[2]), 120);
 
-// Likewise the clock it reads. The pace model adds climbing time in small
-// steps (Naismith on 5 m hysteresis gain), so on the way up, time-of-day
-// warming arrived in tiny jumps against continuous elevation cooling — a
-// fine sawtooth on the temperature chart. Smoothed per leg so the real
+// Likewise the clock it reads, so small per-segment pace changes don't put
+// a fine sawtooth on the temperature chart. Smoothed per leg so the real
 // 30-minute break at the top stays a clean step.
 const weatherHour = (() => {
   const up = gaussSmooth(hourAtPoint.slice(0, turnIdx + 1), 60, cumDist.slice(0, turnIdx + 1));
@@ -1473,7 +1504,7 @@ loadLiveForecast().catch(err => {
 // Pandolf (W): M = 1.5W + 2(W+L)(L/W)^2 + η(W+L)(1.5V^2 + 0.35VG), with
 // grade from elevation smoothed over ±100 m so per-point noise doesn't
 // inflate it, and descents clamped to G = 0.
-const BODY_KG = 77.1, PACK_KG = 6.8, ETA = 1.2; // 170 lb, 15 lb, dirt/rocky trail
+const BODY_KG = 77.1, PACK_KG = 6.8, ETA = 1.5; // 170 lb, 15 lb; 1.5 = rough, rocky trail (load-carriage equations underpredict on complex terrain)
 const smoothEle = smoothElevation(100);
 
 function legStats(i0, i1) {
@@ -1482,7 +1513,7 @@ function legStats(i0, i1) {
   for (let i = i0 + 1; i <= i1; i++) {
     const d = cumDist[i] - cumDist[i-1];
     if (d <= 0) continue;
-    const dt = (d / 1609.34) / PACE_MPH + (climbAt[i] - climbAt[i-1]) * CLIMB_HR_PER_M;
+    const dt = segHrs[i];
     const V = d / (dt * 3600);
     const G = Math.min(40, Math.max(0, (smoothEle[i] - smoothEle[i-1]) / d * 100));
     const M = 1.5 * W + 2 * (W + L) * (L / W) ** 2 + ETA * (W + L) * (1.5 * V * V + 0.35 * V * G);
