@@ -567,6 +567,9 @@
     background: var(--note-bg);
     border-left-color: var(--note-line);
   }
+  /* Totals always gets its own full-width row: its table needs the width,
+     and on wide screens the four cards would otherwise share one row. */
+  #itin-body .itin-totals, #energy-body .itin-totals { flex-basis: 100%; }
 
   /* Header row: trip title on the left, theme switch on the right. */
   .itin-header {
