@@ -5,10 +5,23 @@
 <title>Agua Piedra to Jicarita Peak Loop &ndash; Sept 5&ndash;7, 2026</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="format-detection" content="telephone=no, date=no, address=no, email=no, url=no">
+<script>
+  // Apply a saved light/dark choice before first paint so the page never
+  // flashes the wrong theme. No saved choice = follow the system setting.
+  try {
+    const t = localStorage.getItem('theme');
+    if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+  } catch (e) { /* storage unavailable: follow the system setting */ }
+</script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <style>
+  /* Theme tokens. Light is the default; dark applies when the system prefers
+     it (unless the viewer picked light), or when the viewer picked dark. The
+     base map switches too (see applyMapTheme), so the map's controls follow
+     these tokens; its markers keep fixed colors that read on either map. */
   :root {
+    color-scheme: light;
     --ink: #33312c;
     --paper: #faf8f3;
     --surface: #ffffff;
@@ -17,9 +30,98 @@
     --accent-soft: #e6eaed;
     --line: #e8e2d5;
     --muted: #918b7c;
+    --link-underline: rgba(0,0,0,0.25);
+    --day1-bg: rgba(239,118,122,0.16);
+    --day1-line: #ef767a;
+    --day2-bg: rgba(69,105,144,0.14);
+    --day2-line: #456990;
+    --day3-bg: rgba(73,190,170,0.16);
+    --day3-line: #49beaa;
+    --map-bg: #eee9dc;
+    --map-btn-bg: #ffffff;
+    --map-btn-hover: #f4f4f4;
+    --map-btn-ink: #000000;
+    --map-btn-border: #cccccc;
+    --note-bg: rgba(224,180,0,0.16);
+    --note-line: #e0b400;
+    --chart-elev-stroke: #34495e;
+    --chart-elev-fill: rgba(52,73,94,0.14);
+    --chart-temp-stroke: #ffcc00;
+    --chart-temp-fill: rgba(255,204,0,0.18);
+    --chart-precip-stroke: #3498db;
+    --chart-precip-fill: rgba(52,152,219,0.16);
+    --chart-hover: rgba(43,42,39,0.4);
     --radius: 14px;
     --radius-sm: 9px;
     --shadow: 0 2px 10px rgba(60, 50, 30, 0.08), 0 1px 2px rgba(60, 50, 30, 0.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --ink: #ece6e0;
+      --paper: #1c1b1a;
+      --surface: #272625;
+      --accent: #9fb4c8;
+      --accent-dark: #c9d6e3;
+      --accent-soft: #2e3540;
+      --line: #3e3c3a;
+      --muted: #a89d94;
+      --link-underline: rgba(255,255,255,0.3);
+      --day1-bg: rgba(239,118,122,0.17);
+      --day1-line: #ef767a;
+      --day2-bg: rgba(110,150,195,0.18);
+      --day2-line: #6e96c3;
+      --day3-bg: rgba(73,190,170,0.15);
+      --day3-line: #49beaa;
+      --map-bg: #1f1f1f;
+      --map-btn-bg: #2f2e2c;
+      --map-btn-hover: #3a3936;
+      --map-btn-ink: #ece6e0;
+      --map-btn-border: #45423f;
+      --note-bg: rgba(230,150,40,0.15);
+      --note-line: #d99a3a;
+      --chart-elev-stroke: #b8c7d6;
+      --chart-elev-fill: rgba(184,199,214,0.14);
+      --chart-temp-stroke: #ffcc00;
+      --chart-temp-fill: rgba(255,170,40,0.14);
+      --chart-precip-stroke: #5dade2;
+      --chart-precip-fill: rgba(93,173,226,0.16);
+      --chart-hover: rgba(236,230,224,0.45);
+      --shadow: 0 2px 10px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ink: #ece6e0;
+    --paper: #1c1b1a;
+    --surface: #272625;
+    --accent: #9fb4c8;
+    --accent-dark: #c9d6e3;
+    --accent-soft: #2e3540;
+    --line: #3e3c3a;
+    --muted: #a89d94;
+    --link-underline: rgba(255,255,255,0.3);
+    --day1-bg: rgba(239,118,122,0.17);
+    --day1-line: #ef767a;
+    --day2-bg: rgba(110,150,195,0.18);
+    --day2-line: #6e96c3;
+    --day3-bg: rgba(73,190,170,0.15);
+    --day3-line: #49beaa;
+    --map-bg: #1f1f1f;
+    --map-btn-bg: #2f2e2c;
+    --map-btn-hover: #3a3936;
+    --map-btn-ink: #ece6e0;
+    --map-btn-border: #45423f;
+    --note-bg: rgba(230,150,40,0.15);
+    --note-line: #d99a3a;
+    --chart-elev-stroke: #b8c7d6;
+    --chart-elev-fill: rgba(184,199,214,0.14);
+    --chart-temp-stroke: #ffcc00;
+    --chart-temp-fill: rgba(255,170,40,0.14);
+    --chart-precip-stroke: #5dade2;
+    --chart-precip-fill: rgba(93,173,226,0.16);
+    --chart-hover: rgba(236,230,224,0.45);
+    --shadow: 0 2px 10px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.3);
   }
   * { box-sizing: border-box; }
   html {
@@ -111,7 +213,12 @@
     width: 100%;
     height: 100%;
   }
-  .leaflet-container { background: #eee9dc; font-family: inherit; }
+  .leaflet-container { background: var(--map-bg); font-family: inherit; }
+  /* Dark-map contours, drawn in black by the service, inverted to light gray.
+     Their opacity is set on the Leaflet layer (see ContourLayer below):
+     Leaflet writes an inline opacity on the layer once its tiles load,
+     which would override an opacity set here. */
+  .contour-layer { filter: grayscale(1) invert(1); }
 
   /* Elevation + temperature profile */
   /* Bottom reserve. A real in-flow element rather than padding on #app —
@@ -276,20 +383,26 @@
   .panel-collapsed { padding-bottom: 2px; }
 
   .reset-zoom-btn, .download-gpx-btn {
-    background-color: #fff;
+    background-color: var(--map-btn-bg);
     width: 26px; height: 26px;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 6px;
     cursor: pointer;
-    color: black;
+    color: var(--map-btn-ink);
     text-decoration: none;
   }
-  .reset-zoom-btn:hover, .download-gpx-btn:hover { background-color: #f4f4f4; }
+  .reset-zoom-btn:hover, .download-gpx-btn:hover { background-color: var(--map-btn-hover); }
   .reset-zoom-btn svg, .download-gpx-btn svg { transform: translateY(3px); }
   .leaflet-bar { border-radius: 8px !important; overflow: hidden; }
   .leaflet-bar a { border-radius: 0 !important; }
+  /* Leaflet's own zoom buttons, themed to match. */
+  .leaflet-bar a, .leaflet-bar a:hover { background-color: var(--map-btn-bg); color: var(--map-btn-ink); border-bottom-color: var(--map-btn-border); }
+  .leaflet-bar a:hover, .leaflet-bar a:focus,
+  .reset-zoom-btn:focus, .download-gpx-btn:focus { background-color: var(--map-btn-hover); }
+  .leaflet-bar a.leaflet-disabled { background-color: var(--map-btn-bg); color: var(--muted); }
+  .leaflet-touch .leaflet-bar { border-color: var(--map-btn-border); }
 
   #energy-card {
     flex-shrink: 0;
@@ -377,8 +490,8 @@
     flex: 1 1 220px;
     padding: 8px 11px;
     border-radius: var(--radius-sm);
-    background: rgba(224,180,0,0.16);
-    border-left: 3px solid #e0b400;
+    background: var(--note-bg);
+    border-left: 3px solid var(--note-line);
   }
   .note-label {
     font-weight: 700;
@@ -419,7 +532,7 @@
   #itin-panel h2 a {
     color: inherit;
     text-decoration: underline;
-    text-decoration-color: rgba(0,0,0,0.25);
+    text-decoration-color: var(--link-underline);
     text-underline-offset: 2px;
   }
   #itin-panel h2 a:hover,
@@ -446,9 +559,69 @@
   .itin-day .itin-temp { font-weight: 600; color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
   .itin-day .itin-stats { color: var(--muted); font-size: 0.8rem; }
   .itin-totals {
-    background: rgba(224,180,0,0.16);
-    border-left-color: #e0b400;
+    background: var(--note-bg);
+    border-left-color: var(--note-line);
   }
+  /* Day colors, matching each day's line on the map and bar under the charts. */
+  .itin-day1 { background: var(--day1-bg); border-left-color: var(--day1-line); }
+  .itin-day2 { background: var(--day2-bg); border-left-color: var(--day2-line); }
+  .itin-day3 { background: var(--day3-bg); border-left-color: var(--day3-line); }
+
+  /* Header row: home button on the left, trip title centered, theme switch
+     on the right. Equal 1fr side columns keep the title truly centered. */
+  .itin-header {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  #itin-panel .itin-header h2 { margin: 0; text-align: center; }
+  .itin-header .theme-switch { justify-self: end; }
+  .home-btn {
+    justify-self: start;
+    width: 30px; height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--paper);
+    color: var(--muted);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .home-btn:hover { color: var(--ink); }
+  .home-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .home-btn svg { width: 15px; height: 15px; }
+  .theme-switch {
+    flex-shrink: 0;
+    display: inline-flex;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 2px;
+    background: var(--paper);
+  }
+  .theme-switch button {
+    width: 28px; height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 999px;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .theme-switch button:hover { color: var(--ink); }
+  .theme-switch button[aria-pressed="true"] {
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+  }
+  .theme-switch button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .theme-switch svg { width: 15px; height: 15px; }
 
   @media (max-width: 680px) {
     #app { padding: 8px; gap: 8px; }
@@ -520,7 +693,15 @@
 <body>
 <div id="app">
   <div id="itin-panel">
-    <h2><a href="https://www.alltrails.com/explore/custom-routes/custom-route-b733990?u=i&amp;sh=se65qt" target="_blank" rel="noopener">Agua Piedra to Jicarita Peak Loop</a> <span class="date-range">&ndash; Sept 5&ndash;7, 2026</span></h2>
+    <div class="itin-header">
+      <a class="home-btn" href="index.html" title="All artifacts" aria-label="Back to Artifacts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg></a>
+      <h2><a href="https://www.alltrails.com/explore/custom-routes/custom-route-b733990?u=i&amp;sh=se65qt" target="_blank" rel="noopener">Agua Piedra to Jicarita Peak Loop</a> <span class="date-range">&ndash; Sept 5&ndash;7, 2026</span></h2>
+      <div class="theme-switch" role="group" aria-label="Color theme">
+        <button type="button" data-theme-choice="system" title="Match system" aria-label="Match system theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+        <button type="button" data-theme-choice="light" title="Light" aria-label="Light theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
+        <button type="button" data-theme-choice="dark" title="Dark" aria-label="Dark theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></button>
+      </div>
+    </div>
     <div id="itin-body"></div>
   </div>
   <div id="content-row">
@@ -565,15 +746,15 @@
     <h2>Energy &amp; Hydration</h2>
     <div class="energy-intro">Estimated for a 170&nbsp;lb reference hiker with a 25&ndash;35&nbsp;lb pack, using the <a href="https://en.wikipedia.org/wiki/Pandolf_equation" target="_blank" rel="noopener">Pandolf load-carriage equation</a> applied to this route's actual grade, and a <a href="https://www.rei.com/learn/expert-advice/hydrate.html" target="_blank" rel="noopener">wilderness-medicine&ndash;style hydration baseline</a> (0.5 L/hr moderate pace, +altitude, +25% for sustained steep grade under load). Heavier or lighter hikers should scale up or down accordingly &mdash; the load-carriage terms scale roughly with body weight.</div>
     <div id="energy-body">
-      <div class="itin-day" style="background:rgba(239,118,122,0.16); border-left-color:#ef767a;">
+      <div class="itin-day itin-day1">
         <div class="itin-label">Day 1</div>
         <div class="itin-stats">You'll burn roughly 1,590 to 1,660 calories hiking, about 3,400 to 3,500 calories total for the day. Carry about 2.5 to 3 liters of water &mdash; it's frequent for the first 2.3 miles, then there's a dry, steep 2.7-mile stretch (roughly 2.2 hours) before Los Esteros.</div>
       </div>
-      <div class="itin-day" style="background:rgba(69,105,144,0.14); border-left-color:#456990;">
+      <div class="itin-day itin-day2">
         <div class="itin-label">Day 2</div>
         <div class="itin-stats">You'll burn roughly 1,360 to 1,420 calories hiking, about 3,200 to 3,250 calories total for the day. Carry about 4.5 to 5 liters of water, since there's none at all from Los Esteros to Serpent Lake &mdash; the entire 6.5-mile day, including the summit, is dry.</div>
       </div>
-      <div class="itin-day" style="background:rgba(73,190,170,0.16); border-left-color:#49beaa;">
+      <div class="itin-day itin-day3">
         <div class="itin-label">Day 3</div>
         <div class="itin-stats">You'll burn roughly 1,340 to 1,390 calories hiking, about 3,150 to 3,200 calories total for the day. Carry about 5 to 5.5 liters leaving Serpent Lake &mdash; the stretch to Indian Lake is 9.1 dry miles, roughly 5.2 hours, so top off there before the final 1.7 miles.</div>
       </div>
@@ -706,7 +887,7 @@ const ResetZoomControl = L.Control.extend({
     const btn = L.DomUtil.create('a', 'reset-zoom-btn', container);
     btn.href = '#';
     btn.title = 'Reset zoom';
-    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 8 3 3 8 3"/><polyline points="16 3 21 3 21 8"/><polyline points="21 16 21 21 16 21"/><polyline points="8 21 3 21 3 16"/></svg>';
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 8 3 3 8 3"/><polyline points="16 3 21 3 21 8"/><polyline points="21 16 21 21 16 21"/><polyline points="8 21 3 21 3 16"/></svg>';
     L.DomEvent.on(btn, 'click', function(e) {
       L.DomEvent.stop(e);
       userAdjustedMap = false; // an explicit reset re-enables auto-fit-on-settle, same as the initial load
@@ -724,7 +905,7 @@ const DownloadGpxControl = L.Control.extend({
     const btn = L.DomUtil.create('a', 'download-gpx-btn', container);
     btn.href = '#';
     btn.title = 'Download GPX';
-    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><polyline points="6 11 12 17 18 11"/><path d="M4 21h16"/></svg>';
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><polyline points="6 11 12 17 18 11"/><path d="M4 21h16"/></svg>';
     L.DomEvent.on(btn, 'click', function(e) {
       L.DomEvent.stop(e);
       downloadGpx();
@@ -781,11 +962,90 @@ map.on('popupopen', function(e) {
   }
 });
 
-
-const osmLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+// ---------- Base map: light and dark ----------
+// Light theme: OpenTopoMap.
+// Dark theme: a natively dark stack instead of an inverted light map (which
+// lights the terrain shading from the wrong side): Esri's dark gray base and
+// dark hillshade, Esri's dark place-name labels, and USGS contour lines
+// restyled for a dark background. All keyless, with attribution.
+const lightBase = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
   maxZoom: 17,
   attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
-}).addTo(map);
+});
+
+// The USGS contour service has no prebuilt tiles, so each map tile asks its
+// export endpoint to draw that tile's area (a second or two per tile). Each
+// contour set (large-scale, 50-ft, 100-ft) only draws within its own scale
+// range — requests to force one outside it come back blank — so all three
+// are listed and the service picks the one that fits each zoom. Restyled via
+// dynamicLayers: index contours solid, intermediates faint, elevation labels
+// dim and halo-free. Drawn in black; the .contour-layer CSS filter turns
+// them light gray for the dark background.
+const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
+const USGS_CONTOURS = 'https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/export';
+const contourDynamicLayers = (() => {
+  const sls = (rgba, width) => ({ type: 'esriSLS', style: 'esriSLSSolid', color: rgba, width });
+  const line = (rgba, width) => ({ renderer: { type: 'simple', symbol: sls(rgba, width) } });
+  const labels = {
+    renderer: { type: 'simple', symbol: sls([0, 0, 0, 0], 0) }, // labels only; no line
+    showLabels: true,
+    labelingInfo: [{
+      labelExpression: '[CONTOURELEVATION] CONCAT " ft"',
+      labelPlacement: 'esriServerLinePlacementCenterAlong',
+      deconflictionStrategy: 'dynamic', repeatLabel: false, removeDuplicates: 'all', removeDuplicatesDistance: 216,
+      minScale: 0, maxScale: 0,
+      symbol: { type: 'esriTS', color: [0, 0, 0, 140], haloSize: 0, haloColor: null,
+                font: { family: 'Arial', size: 8, style: 'normal', weight: 'normal' } }
+    }]
+  };
+  const lyr = (id, drawingInfo) => ({ id, source: { type: 'mapLayer', mapLayerId: id }, drawingInfo });
+  const faint = line([0, 0, 0, 55], 0.4), solid = line([0, 0, 0, 140], 0.5);
+  // Large-scale: 26 intermediate, 25 index, 21 index labels; 50-ft: 18, 16, 15; 100-ft: 13, 11, 10.
+  return JSON.stringify([
+    lyr(26, faint), lyr(25, solid), lyr(21, labels),
+    lyr(18, faint), lyr(16, solid), lyr(15, labels),
+    lyr(13, faint), lyr(11, solid), lyr(10, labels)
+  ]);
+})();
+const ContourLayer = L.TileLayer.extend({
+  getTileUrl(c) {
+    // Map tile (x, y, z) -> Web Mercator bounds of that tile.
+    const half = Math.PI * 6378137, size = 2 * half / Math.pow(2, c.z);
+    const xmin = -half + c.x * size, ymax = half - c.y * size;
+    return `${USGS_CONTOURS}?bbox=${xmin},${ymax - size},${xmin + size},${ymax}`
+      + '&bboxSR=3857&imageSR=3857&size=256,256&format=png32&transparent=true&dpi=96'
+      + `&dynamicLayers=${encodeURIComponent(contourDynamicLayers)}&f=image`;
+  }
+});
+
+// Esri's dark layers stop at zoom 16; zoom 17 enlarges them so the dark map
+// zooms exactly as far as the light one.
+const darkOpts = { maxNativeZoom: 16, maxZoom: 17 };
+const darkBase = L.layerGroup([
+  L.tileLayer(ESRI + 'Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', darkOpts),
+  L.tileLayer(ESRI + 'Elevation/World_Hillshade_Dark/MapServer/tile/{z}/{y}/{x}', { ...darkOpts, opacity: 0.85 }),
+  // Faded to about as subtle as OpenTopoMap's contours on the light map.
+  // Unlike Esri's tiles, the USGS service draws its large-scale contours at
+  // any zoom, so it renders natively all the way in rather than enlarging.
+  new ContourLayer('', { ...darkOpts, maxNativeZoom: 17, className: 'contour-layer', opacity: 0.38,
+    attribution: 'Contours: <a href="https://www.usgs.gov/programs/national-geospatial-program/national-map">USGS The National Map</a>' }),
+  L.tileLayer(ESRI + 'Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', { ...darkOpts,
+    attribution: 'Tiles &copy; <a href="https://www.esri.com/">Esri</a> &mdash; Esri, USGS, HERE, Garmin, FAO, NOAA, and the GIS User Community' })
+]);
+
+function isDarkTheme() {
+  const t = document.documentElement.dataset.theme;
+  return t ? t === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+// Swap base maps to match the theme; called at load and on every theme change.
+function applyMapTheme() {
+  const dark = isDarkTheme();
+  const show = dark ? darkBase : lightBase, hide = dark ? lightBase : darkBase;
+  if (map.hasLayer(hide)) map.removeLayer(hide);
+  if (!map.hasLayer(show)) map.addLayer(show);
+}
+applyMapTheme();
 
 const trackLine = L.polyline(latlngs, {
   color: '#b5502e',
@@ -797,8 +1057,23 @@ const trackLine = L.polyline(latlngs, {
 // ---------- 3-day itinerary ----------
 // Day breaks chosen so camps land at Los Esteros (end of day 1) and Serpent Lake (end of day 2)
 const dayBreaks = [0, 333, 703, track.length - 1];
-const dayColors = ['#ef767a', '#456990', '#49beaa'];
-const dayColorsSoft = ['rgba(239,118,122,0.16)', 'rgba(69,105,144,0.14)', 'rgba(73,190,170,0.16)'];
+const dayLines = []; // each day's route line on the map, restyled when the theme changes
+
+// Chart colors come from the theme's CSS custom properties, read once here
+// and again whenever the theme changes (canvas can't use var() directly).
+let chartColors = {};
+function readChartColors() {
+  const cs = getComputedStyle(document.documentElement);
+  const v = name => cs.getPropertyValue(name).trim();
+  chartColors = {
+    elevStroke: v('--chart-elev-stroke'), elevFill: v('--chart-elev-fill'),
+    tempStroke: v('--chart-temp-stroke'), tempFill: v('--chart-temp-fill'),
+    precipStroke: v('--chart-precip-stroke'), precipFill: v('--chart-precip-fill'),
+    hover: v('--chart-hover'), muted: v('--muted'),
+    days: [v('--day1-line'), v('--day2-line'), v('--day3-line')]
+  };
+}
+readChartColors();
 const dayFrom = ['the trailhead', 'Los Esteros', 'Serpent Lake'];
 const dayTo = ['Los Esteros', 'Serpent Lake', 'the trailhead'];
 const dayVia = [null, 'Jicarita Peak', null];
@@ -880,8 +1155,8 @@ const itinBody = document.getElementById('itin-body');
 for (let d = 0; d < 3; d++) {
   const i0 = dayBreaks[d], i1 = dayBreaks[d+1];
   const segLatLngs = latlngs.slice(i0, i1 + 1);
-  L.polyline(segLatLngs, {
-    color: dayColors[d],
+  dayLines[d] = L.polyline(segLatLngs, {
+    color: chartColors.days[d],
     weight: 5,
     opacity: 0.95,
     lineJoin: 'round'
@@ -907,7 +1182,7 @@ for (let d = 0; d < 3; d++) {
   const sentence = `Starting at ${dayFrom[d]} at ${fmtHourNatural(startHour)} and ending at ${dayTo[d]} at ${fmtHourNatural(endHour)}${viaText} this segment is ${fmtMiles(distMi)} miles long with ${gainFtD} feet of elevation gain and ${lossFtD} feet of elevation loss.`;
 
   itinBody.innerHTML += `
-    <div class="itin-day" style="background:${dayColorsSoft[d]}; border-left-color:${dayColors[d]};">
+    <div class="itin-day itin-day${d + 1}">
       <div class="itin-label">Day ${d+1}<span class="itin-temp" id="itin-temp-${d}"></span></div>
       <div class="itin-stats">${sentence}</div>
     </div>`;
@@ -1478,7 +1753,7 @@ function drawSeries(ctx, canvas, values, valMin, valMax, hoverIndex, opts) {
     ctx.beginPath();
     ctx.moveTo(xAt(i0), padT + plotH + 4*devicePixelRatio);
     ctx.lineTo(xAt(i1), padT + plotH + 4*devicePixelRatio);
-    ctx.strokeStyle = dayColors[d];
+    ctx.strokeStyle = chartColors.days[d];
     ctx.lineWidth = 3 * devicePixelRatio;
     ctx.stroke();
   }
@@ -1488,7 +1763,7 @@ function drawSeries(ctx, canvas, values, valMin, valMax, hoverIndex, opts) {
     ctx.beginPath();
     ctx.moveTo(x, padT);
     ctx.lineTo(x, padT + plotH);
-    ctx.strokeStyle = 'rgba(43,42,39,0.4)';
+    ctx.strokeStyle = chartColors.hover;
     ctx.lineWidth = 1 * devicePixelRatio;
     ctx.stroke();
     ctx.beginPath();
@@ -1500,23 +1775,23 @@ function drawSeries(ctx, canvas, values, valMin, valMax, hoverIndex, opts) {
 
 function drawElevation(hoverIndex) {
   drawSeries(elevCtx, elevCanvas, track.map(p => p[2]), minEle, maxEle, hoverIndex, {
-    fill: 'rgba(52,73,94,0.14)',
-    stroke: '#34495e'
+    fill: chartColors.elevFill,
+    stroke: chartColors.elevStroke
   });
 }
 
 function drawTemp(hoverIndex) {
   // Yellow, matching Apple Weather's temperature color.
   drawSeries(tempCtx, tempCanvas, tempAtPoint, minTemp, maxTemp, hoverIndex, {
-    fill: 'rgba(255,204,0,0.18)',
-    stroke: '#ffcc00'
+    fill: chartColors.tempFill,
+    stroke: chartColors.tempStroke
   });
 }
 
 function drawPrecip(hoverIndex) {
   if (!hasPrecipData) {
     precipCtx.clearRect(0, 0, precipCanvas.width, precipCanvas.height);
-    precipCtx.fillStyle = '#918b7c';
+    precipCtx.fillStyle = chartColors.muted;
     precipCtx.font = `${12.5 * devicePixelRatio}px sans-serif`;
     precipCtx.textAlign = 'center';
     precipCtx.fillText('Precipitation forecast unavailable', precipCanvas.width / 2, precipCanvas.height / 2);
@@ -1525,8 +1800,8 @@ function drawPrecip(hoverIndex) {
   }
   // Blue reads as "water/rain" more intuitively than the previous teal-green.
   drawSeries(precipCtx, precipCanvas, precipAtPoint, 0, maxPrecip, hoverIndex, {
-    fill: 'rgba(52,152,219,0.16)',
-    stroke: '#3498db'
+    fill: chartColors.precipFill,
+    stroke: chartColors.precipStroke
   });
 }
 
@@ -1749,6 +2024,45 @@ profileWrap.addEventListener('touchend', () => {
   profileFooter.textContent = '';
   touchMode = null;
 });
+
+// ---------- Light / dark theme switch ----------
+// Three choices: follow the system (default, nothing saved), or force light
+// or dark (saved in this browser). The early <head> script applies a saved
+// choice before first paint; this wires up the buttons and redraws the
+// canvas charts whenever the effective theme changes.
+const themeButtons = document.querySelectorAll('[data-theme-choice]');
+const systemDark = window.matchMedia('(prefers-color-scheme: dark)');
+
+function currentThemeChoice() {
+  const t = document.documentElement.dataset.theme;
+  return t === 'light' || t === 'dark' ? t : 'system';
+}
+
+function applyThemeChoice(choice) {
+  if (choice === 'system') delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = choice;
+  try {
+    if (choice === 'system') localStorage.removeItem('theme');
+    else localStorage.setItem('theme', choice);
+  } catch (e) { /* storage unavailable: the choice just won't persist */ }
+  refreshTheme();
+}
+
+function refreshTheme() {
+  const choice = currentThemeChoice();
+  themeButtons.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.themeChoice === choice)));
+  readChartColors();
+  drawElevation(-1);
+  drawTemp(-1);
+  drawPrecip(-1);
+  dayLines.forEach((line, d) => line.setStyle({ color: chartColors.days[d] }));
+  applyMapTheme();
+}
+
+themeButtons.forEach(b => b.addEventListener('click', () => applyThemeChoice(b.dataset.themeChoice)));
+// While following the system, redraw the charts if the system theme flips.
+systemDark.addEventListener('change', () => { if (currentThemeChoice() === 'system') refreshTheme(); });
+themeButtons.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.themeChoice === currentThemeChoice())));
 </script>
 </body>
 </html>
