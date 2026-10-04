@@ -18,8 +18,8 @@
 <style>
   /* Theme tokens. Light is the default; dark applies when the system prefers
      it (unless the viewer picked light), or when the viewer picked dark. The
-     map tiles stay light in both themes — there's no dark version of the
-     Esri topo map — so the map's own markers/controls use fixed colors. */
+     base map switches too (see applyMapTheme), so the map's controls follow
+     these tokens; its markers keep fixed colors that read on either map. */
   :root {
     color-scheme: light;
     --ink: #33312c;
@@ -37,6 +37,11 @@
     --down-line: #456990;
     --opt-bg: rgba(73,190,170,0.16);
     --opt-line: #49beaa;
+    --map-bg: #eee9dc;
+    --map-btn-bg: #ffffff;
+    --map-btn-hover: #f4f4f4;
+    --map-btn-ink: #000000;
+    --map-btn-border: #cccccc;
     --note-bg: rgba(224,180,0,0.16);
     --note-line: #e0b400;
     --chart-elev-stroke: #34495e;
@@ -68,6 +73,11 @@
       --down-line: #6e96c3;
       --opt-bg: rgba(73,190,170,0.15);
       --opt-line: #49beaa;
+      --map-bg: #1f1f1f;
+      --map-btn-bg: #2f2e2c;
+      --map-btn-hover: #3a3936;
+      --map-btn-ink: #ece6e0;
+      --map-btn-border: #45423f;
       --note-bg: rgba(230,150,40,0.15);
       --note-line: #d99a3a;
       --chart-elev-stroke: #b8c7d6;
@@ -97,6 +107,11 @@
     --down-line: #6e96c3;
     --opt-bg: rgba(73,190,170,0.15);
     --opt-line: #49beaa;
+    --map-bg: #1f1f1f;
+    --map-btn-bg: #2f2e2c;
+    --map-btn-hover: #3a3936;
+    --map-btn-ink: #ece6e0;
+    --map-btn-border: #45423f;
     --note-bg: rgba(230,150,40,0.15);
     --note-line: #d99a3a;
     --chart-elev-stroke: #b8c7d6;
@@ -197,7 +212,9 @@
     width: 100%;
     height: 100%;
   }
-  .leaflet-container { background: #eee9dc; font-family: inherit; }
+  .leaflet-container { background: var(--map-bg); font-family: inherit; }
+  /* USGS contours are drawn in black; flip them to light gray for the dark map. */
+  .contour-layer { filter: grayscale(1) invert(1); opacity: 0.45; }
 
   /* Bottom reserve. A real in-flow element rather than padding on #app —
      iOS Safari is far more reliable about counting an element toward the
@@ -274,7 +291,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  /* Map markers sit on the always-light tiles, so they keep fixed colors. */
+  /* Map markers keep fixed colors: dark dots with a white ring read on both the light and dark maps. */
   .marker-label {
     background: #34495e;
     color: white;
@@ -302,20 +319,26 @@
   .leaflet-popup-tip { background: var(--surface); border: 1px solid var(--line); }
 
   .reset-zoom-btn, .download-gpx-btn {
-    background-color: #fff;
+    background-color: var(--map-btn-bg);
     width: 26px; height: 26px;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 6px;
     cursor: pointer;
-    color: black;
+    color: var(--map-btn-ink);
     text-decoration: none;
   }
-  .reset-zoom-btn:hover, .download-gpx-btn:hover { background-color: #f4f4f4; }
+  .reset-zoom-btn:hover, .download-gpx-btn:hover { background-color: var(--map-btn-hover); }
   .reset-zoom-btn svg, .download-gpx-btn svg { transform: translateY(3px); }
   .leaflet-bar { border-radius: 8px !important; overflow: hidden; }
   .leaflet-bar a { border-radius: 0 !important; }
+  /* Leaflet's own zoom buttons, themed to match. */
+  .leaflet-bar a, .leaflet-bar a:hover { background-color: var(--map-btn-bg); color: var(--map-btn-ink); border-bottom-color: var(--map-btn-border); }
+  .leaflet-bar a:hover, .leaflet-bar a:focus,
+  .reset-zoom-btn:focus, .download-gpx-btn:focus { background-color: var(--map-btn-hover); }
+  .leaflet-bar a.leaflet-disabled { background-color: var(--map-btn-bg); color: var(--muted); }
+  .leaflet-touch .leaflet-bar { border-color: var(--map-btn-border); }
 
   #energy-card {
     flex-shrink: 0;
@@ -894,7 +917,7 @@ const ResetZoomControl = L.Control.extend({
     const btn = L.DomUtil.create('a', 'reset-zoom-btn', container);
     btn.href = '#';
     btn.title = 'Reset zoom';
-    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 8 3 3 8 3"/><polyline points="16 3 21 3 21 8"/><polyline points="21 16 21 21 16 21"/><polyline points="8 21 3 21 3 16"/></svg>';
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 8 3 3 8 3"/><polyline points="16 3 21 3 21 8"/><polyline points="21 16 21 21 16 21"/><polyline points="8 21 3 21 3 16"/></svg>';
     L.DomEvent.on(btn, 'click', function(e) {
       L.DomEvent.stop(e);
       userAdjustedMap = false;
@@ -912,7 +935,7 @@ const DownloadGpxControl = L.Control.extend({
     const btn = L.DomUtil.create('a', 'download-gpx-btn', container);
     btn.href = '#';
     btn.title = 'Download GPX';
-    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><polyline points="6 11 12 17 18 11"/><path d="M4 21h16"/></svg>';
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><polyline points="6 11 12 17 18 11"/><path d="M4 21h16"/></svg>';
     L.DomEvent.on(btn, 'click', function(e) {
       L.DomEvent.stop(e);
       downloadGpx();
@@ -960,12 +983,89 @@ map.on('popupopen', function(e) {
   }
 });
 
-// Esri World Topographic Map: pale, low-contrast cartography with contours,
-// so the route line stands out. Keyless tile access with attribution.
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+// ---------- Base map: light and dark ----------
+// Light theme: Esri World Topographic Map — pale, low-contrast cartography
+// with contours, so the route line stands out.
+// Dark theme: a natively dark stack instead of an inverted light map (which
+// lights the terrain shading from the wrong side): Esri's dark gray base and
+// dark hillshade, Esri's dark place-name labels, and USGS contour lines
+// restyled for a dark background. All keyless, with attribution.
+const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
+const lightBase = L.tileLayer(ESRI + 'World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
   maxZoom: 19,
   attribution: 'Tiles &copy; <a href="https://www.esri.com/">Esri</a> &mdash; Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC, USGS, FAO, NPS, NRCAN, GeoBase, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), and the GIS User Community'
-}).addTo(map);
+});
+
+// The USGS contour service has no prebuilt tiles, so each map tile asks its
+// export endpoint to draw that tile's area (a second or two per tile). Each
+// contour set (large-scale, 50-ft, 100-ft) only draws within its own scale
+// range — requests to force one outside it come back blank — so all three
+// are listed and the service picks the one that fits each zoom. Restyled via
+// dynamicLayers: index contours solid, intermediates faint, elevation labels
+// dim and halo-free, sized to match the light map. Drawn in black; the .contour-layer CSS filter turns
+// them light gray for the dark background.
+const USGS_CONTOURS = 'https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/export';
+const contourDynamicLayers = (() => {
+  const sls = (rgba, width) => ({ type: 'esriSLS', style: 'esriSLSSolid', color: rgba, width });
+  const line = (rgba, width) => ({ renderer: { type: 'simple', symbol: sls(rgba, width) } });
+  const labels = {
+    renderer: { type: 'simple', symbol: sls([0, 0, 0, 0], 0) }, // labels only; no line
+    showLabels: true,
+    labelingInfo: [{
+      labelExpression: '[CONTOURELEVATION] CONCAT " ft"', // "9600 ft", like the light map's labels
+      labelPlacement: 'esriServerLinePlacementCenterAlong',
+      deconflictionStrategy: 'dynamic', repeatLabel: false, removeDuplicates: 'all', removeDuplicatesDistance: 216,
+      minScale: 0, maxScale: 0,
+      symbol: { type: 'esriTS', color: [0, 0, 0, 140], haloSize: 0, haloColor: null,
+                // 8 pt matches the light map's contour-label height on screen.
+                font: { family: 'Arial', size: 8, style: 'normal', weight: 'normal' } }
+    }]
+  };
+  const lyr = (id, drawingInfo) => ({ id, source: { type: 'mapLayer', mapLayerId: id }, drawingInfo });
+  const faint = line([0, 0, 0, 55], 0.4), solid = line([0, 0, 0, 140], 0.5);
+  // Large-scale: 26 intermediate, 25 index, 21 index labels; 50-ft: 18, 16, 15; 100-ft: 13, 11, 10.
+  return JSON.stringify([
+    lyr(26, faint), lyr(25, solid), lyr(21, labels),
+    lyr(18, faint), lyr(16, solid), lyr(15, labels),
+    lyr(13, faint), lyr(11, solid), lyr(10, labels)
+  ]);
+})();
+const ContourLayer = L.TileLayer.extend({
+  getTileUrl(c) {
+    // Map tile (x, y, z) -> Web Mercator bounds of that tile.
+    const half = Math.PI * 6378137, size = 2 * half / Math.pow(2, c.z);
+    const xmin = -half + c.x * size, ymax = half - c.y * size;
+    return `${USGS_CONTOURS}?bbox=${xmin},${ymax - size},${xmin + size},${ymax}`
+      + '&bboxSR=3857&imageSR=3857&size=256,256&format=png32&transparent=true&dpi=96'
+      + `&dynamicLayers=${encodeURIComponent(contourDynamicLayers)}&f=image`;
+  }
+});
+
+// Esri's dark layers stop at zoom 16; beyond that they're enlarged so the
+// map can still zoom as far as the light one.
+const darkOpts = { maxNativeZoom: 16, maxZoom: 19 };
+const darkBase = L.layerGroup([
+  L.tileLayer(ESRI + 'Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', darkOpts),
+  L.tileLayer(ESRI + 'Elevation/World_Hillshade_Dark/MapServer/tile/{z}/{y}/{x}', { ...darkOpts, opacity: 0.85 }),
+  new ContourLayer('', { ...darkOpts, className: 'contour-layer',
+    attribution: 'Contours: <a href="https://www.usgs.gov/programs/national-geospatial-program/national-map">USGS The National Map</a>' }),
+  L.tileLayer(ESRI + 'Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', { ...darkOpts,
+    attribution: 'Tiles &copy; <a href="https://www.esri.com/">Esri</a> &mdash; Esri, USGS, HERE, Garmin, FAO, NOAA, and the GIS User Community' })
+]);
+
+function isDarkTheme() {
+  const t = document.documentElement.dataset.theme;
+  return t ? t === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+// Swap base maps to match the theme; called at load and on every theme change.
+function applyMapTheme() {
+  const dark = isDarkTheme();
+  const show = dark ? darkBase : lightBase, hide = dark ? lightBase : darkBase;
+  if (map.hasLayer(hide)) map.removeLayer(hide);
+  if (!map.hasLayer(show)) map.addLayer(show);
+}
+applyMapTheme();
 
 const ROUTE_COLOR = '#ef767a';
 const trackLine = L.polyline(latlngs, {
@@ -1740,6 +1840,7 @@ function refreshTheme() {
   drawElevation(-1);
   drawTemp(-1);
   drawUv(-1);
+  applyMapTheme();
 }
 
 themeButtons.forEach(b => b.addEventListener('click', () => applyThemeChoice(b.dataset.themeChoice)));
