@@ -1205,7 +1205,7 @@ function totalsRows() {
       mi: totalDist / 1609.34, gainM: gain, hrs: finishHour - START_HOUR, finish: finishTxt(finishHour) },
     { plan: `Optional start (${fmtHourNatural(optStart)}), tram down`,
       mi: upMi + optExtraMi, gainM: climbAt[turnIdx] + optExtraGainM, hrs: topHour - optStart, finish: `Top ${fmtHourNatural(topHour)}` },
-    { plan: `Optional start (${fmtHourNatural(optStart)}), hike back down to the lot`,
+    { plan: `Optional start (${fmtHourNatural(optStart)}), hike back down`,
       mi: totalDist / 1609.34 + 2 * optExtraMi, gainM: gain + optExtraGainM + Math.max(0, optDownExtraGainM), hrs: optFinish - optStart, finish: finishTxt(optFinish) }
   ];
 }
@@ -1562,7 +1562,7 @@ function renderEnergy() {
           <tr><td>La Luz Trailhead start, tram down</td><td>${kcalRange(up.kcal)}</td><td>${literRange(up.liters)} L</td></tr>
           <tr><td>La Luz Trailhead start, hike back down</td><td>${kcalRange(up.kcal + down.kcal)}</td><td>${literRange(up.liters + down.liters)} L</td></tr>
           <tr><td>Optional start, tram down</td><td>${kcalRange(up.kcal + opt.up.kcal)}</td><td>${literRange(up.liters + opt.up.liters)} L</td></tr>
-          <tr><td>Optional start, hike back down to the lot</td><td>${kcalRange(up.kcal + down.kcal + opt.up.kcal + opt.down.kcal)}</td><td>${literRange(up.liters + down.liters + opt.up.liters + opt.down.liters)} L</td></tr>
+          <tr><td>Optional start, hike back down</td><td>${kcalRange(up.kcal + down.kcal + opt.up.kcal + opt.down.kcal)}</td><td>${literRange(up.liters + down.liters + opt.up.liters + opt.down.liters)} L</td></tr>
         </tbody>
       </table>
       <div class="itin-stats">Calories are for hiking only. Aim to eat around 200&ndash;300 calories an hour on the move. There's no water on the trail itself. Ten 3 at the top lets you refill for the hike down as long as the tram is running (it closes in high winds), so carry the tram-down amount from the car, plus about a liter in reserve in case it's closed.</div>
