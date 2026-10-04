@@ -216,8 +216,11 @@
     height: 100%;
   }
   .leaflet-container { background: var(--map-bg); font-family: inherit; }
-  /* USGS contours are drawn in black; flip them to light gray for the dark map. */
-  .contour-layer { filter: grayscale(1) invert(1); opacity: 0.45; }
+  /* USGS contours are drawn in black; flip them to light gray for the dark map.
+     Their opacity is set on the Leaflet layer (see ContourLayer below):
+     Leaflet writes an inline opacity on the layer once its tiles load,
+     which would override an opacity set here. */
+  .contour-layer { filter: grayscale(1) invert(1); }
 
   /* Bottom reserve. A real in-flow element rather than padding on #app —
      iOS Safari is far more reliable about counting an element toward the
@@ -1071,7 +1074,10 @@ const darkOpts = { maxNativeZoom: 16, maxZoom: 19 };
 const darkBase = L.layerGroup([
   L.tileLayer(ESRI + 'Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', darkOpts),
   L.tileLayer(ESRI + 'Elevation/World_Hillshade_Dark/MapServer/tile/{z}/{y}/{x}', { ...darkOpts, opacity: 0.85 }),
-  new ContourLayer('', { ...darkOpts, className: 'contour-layer',
+  // Faded to about as subtle as the light map's contours.
+  // Unlike Esri's tiles, the USGS service draws its large-scale contours at
+  // any zoom, so it renders natively all the way in rather than enlarging.
+  new ContourLayer('', { ...darkOpts, maxNativeZoom: 19, className: 'contour-layer', opacity: 0.43,
     attribution: 'Contours: <a href="https://www.usgs.gov/programs/national-geospatial-program/national-map">USGS The National Map</a>' }),
   L.tileLayer(ESRI + 'Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', { ...darkOpts,
     attribution: 'Tiles &copy; <a href="https://www.esri.com/">Esri</a> &mdash; Esri, USGS, HERE, Garmin, FAO, NOAA, and the GIS User Community' })
