@@ -29,6 +29,7 @@
     --accent-dark: #263544;
     --accent-soft: #e6eaed;
     --line: #e8e2d5;
+    --table-rule: #e0d6c2;
     --muted: #918b7c;
     --link-underline: rgba(0,0,0,0.25);
     --up-bg: rgba(239,118,122,0.16);
@@ -65,6 +66,7 @@
       --accent-dark: #c9d6e3;
       --accent-soft: #2e3540;
       --line: #3e3c3a;
+      --table-rule: rgba(236,230,224,0.24);
       --muted: #a89d94;
       --link-underline: rgba(255,255,255,0.3);
       --up-bg: rgba(239,118,122,0.17);
@@ -99,6 +101,7 @@
     --accent-dark: #c9d6e3;
     --accent-soft: #2e3540;
     --line: #3e3c3a;
+    --table-rule: rgba(236,230,224,0.24);
     --muted: #a89d94;
     --link-underline: rgba(255,255,255,0.3);
     --up-bg: rgba(239,118,122,0.17);
@@ -551,14 +554,15 @@
     font-weight: 600;
     color: var(--ink);
     padding: 3px 8px 3px 0;
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--table-rule);
   }
+  /* Every row, including the last, gets a rule beneath it. --table-rule is
+     stronger than --line so it still reads on the tinted Totals card. */
   .totals-table td {
     padding: 3px 8px 3px 0;
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--table-rule);
     vertical-align: top;
   }
-  .totals-table tr:last-child td { border-bottom: none; }
   .totals-table td:nth-child(n+2), .totals-table th:nth-child(n+2) { white-space: nowrap; }
   /* Teal, matching the optional-start line on the map. */
   .itin-opt { background: var(--opt-bg); border-left-color: var(--opt-line); }
@@ -571,15 +575,32 @@
      and on wide screens the four cards would otherwise share one row. */
   #itin-body .itin-totals, #energy-body .itin-totals { flex-basis: 100%; }
 
-  /* Header row: trip title on the left, theme switch on the right. */
+  /* Header row: home button on the left, trip title centered, theme switch
+     on the right. Equal 1fr side columns keep the title truly centered. */
   .itin-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
     gap: 10px;
     margin-bottom: 10px;
   }
-  #itin-panel .itin-header h2 { margin: 0; }
+  #itin-panel .itin-header h2 { margin: 0; text-align: center; }
+  .itin-header .theme-switch { justify-self: end; }
+  .home-btn {
+    justify-self: start;
+    width: 30px; height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--paper);
+    color: var(--muted);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .home-btn:hover { color: var(--ink); }
+  .home-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .home-btn svg { width: 15px; height: 15px; }
   .theme-switch {
     flex-shrink: 0;
     display: inline-flex;
@@ -639,9 +660,8 @@
       grid-template-columns: 4.2rem 4.6rem 4.2rem auto;
       column-gap: 10px;
       padding: 5px 0;
-      border-bottom: 1px solid var(--line);
+      border-bottom: 1px solid var(--table-rule);
     }
-    .plans-table tr:last-child { border-bottom: none; }
     .plans-table td { padding: 0; border: none; white-space: normal !important; }
     .plans-table td:first-child { grid-column: 1 / -1; color: var(--ink); margin-bottom: 2px; }
     .plans-table td[data-label]::before {
@@ -687,6 +707,7 @@
 <div id="app">
   <div id="itin-panel">
     <div class="itin-header">
+      <a class="home-btn" href="index.html" title="All artifacts" aria-label="Back to Artifacts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg></a>
       <h2><a href="https://www.alltrails.com/explore/trail/us/new-mexico/la-luz-trail?u=i&amp;sh=se65qt" target="_blank" rel="noopener">La Luz Trail</a> <span class="date-range">&ndash; Oct 9, 2026</span></h2>
       <div class="theme-switch" role="group" aria-label="Color theme">
         <button type="button" data-theme-choice="system" title="Match system" aria-label="Match system theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
@@ -1361,6 +1382,21 @@ function gaussSmooth(vals, sigma, dist = cumDist) {
 const displayEle = gaussSmooth(track.map(p => p[2]), 40);
 const displayEleMin = Math.min(...displayEle), displayEleMax = Math.max(...displayEle);
 
+// Grade (%) at each point for the hover readout: rise over run across the
+// ±50 m around it on the charted elevation, so it matches the slope you see.
+// Signed along the direction of travel, so the way down reads negative.
+const gradeAtPoint = track.map((_, i) => {
+  let j = i, k = i;
+  while (j > 0 && cumDist[i] - cumDist[j] < 50) j--;
+  while (k < track.length - 1 && cumDist[k] - cumDist[i] < 50) k++;
+  const run = cumDist[k] - cumDist[j];
+  return run > 0 ? (displayEle[k] - displayEle[j]) / run * 100 : 0;
+});
+function fmtGrade(g) {
+  const r = Math.round(g);
+  return r === 0 ? '0% grade' : `${r > 0 ? '+' : '−'}${Math.abs(r)}% grade`;
+}
+
 // The weather model reads elevation smoothed more heavily (sigma 120 m).
 // Temperature falls only ~0.34°F per 100 ft here, so per-point elevation
 // wiggles were turning into sub-half-degree jitter on the temperature
@@ -1889,8 +1925,10 @@ function showHover(idx) {
   drawElevation(idx);
   drawTemp(idx);
   drawUv(idx);
-  const liveTxt = liveTh ? ` · UV ${Math.round(uvAtPoint[idx])} (${uvCategory(uvAtPoint[idx])}) · ${Math.round(windAtPoint[idx])} mph wind` : '';
-  profileFooter.textContent = `${(cumDist[idx]/1609.34).toFixed(2)} mi · ${Math.round(displayEle[idx]*3.28084).toLocaleString()} ft · ${Math.round(tempAtPoint[idx])}°F${liveTxt} · ${fmtHour(hourAtPoint[idx])}`;
+  // Elevation, temperature, and UV follow the charts' top-to-bottom order.
+  const uvTxt = liveTh ? ` · UV ${Math.round(uvAtPoint[idx])} (${uvCategory(uvAtPoint[idx])})` : '';
+  const windTxt = liveTh ? ` · ${Math.round(windAtPoint[idx])} mph wind` : '';
+  profileFooter.textContent = `${(cumDist[idx]/1609.34).toFixed(2)} mi · ${fmtHour(hourAtPoint[idx])} · ${Math.round(displayEle[idx]*3.28084).toLocaleString()} ft · ${Math.round(tempAtPoint[idx])}°F${uvTxt} · ${fmtGrade(gradeAtPoint[idx])}${windTxt}`;
 }
 
 function clearHover() {
