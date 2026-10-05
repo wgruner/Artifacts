@@ -346,7 +346,7 @@
   .leaflet-bar a.leaflet-disabled { background-color: var(--map-btn-bg); color: var(--muted); }
   .leaflet-touch .leaflet-bar { border-color: var(--map-btn-border); }
 
-  #energy-card {
+  #itin-card, #energy-card {
     flex-shrink: 0;
     background: var(--surface);
     border: 1px solid var(--line);
@@ -354,14 +354,15 @@
     box-shadow: var(--shadow);
     padding: 12px 16px;
   }
-  #energy-card h2 {
+  #itin-card h2, #energy-card h2 {
     margin: 0 0 8px;
     font-size: 0.95rem;
     font-weight: 700;
     color: var(--accent-dark);
   }
-  .energy-intro {
-    font-size: 0.76rem;
+  /* Intro text matches the body text of the cards beneath it. */
+  .itin-intro, .energy-intro {
+    font-size: 0.75rem;
     color: var(--muted);
     line-height: 1.4;
     margin-bottom: 10px;
@@ -388,7 +389,7 @@
     color: var(--accent-dark);
   }
   .gear-intro {
-    font-size: 0.85rem;
+    font-size: 0.75rem;
     color: var(--muted);
     line-height: 1.4;
     margin-bottom: 10px;
@@ -408,14 +409,14 @@
   .checklist-title {
     font-weight: 700;
     color: var(--ink);
-    font-size: 0.85rem;
+    font-size: 0.875rem;
     margin-bottom: 4px;
   }
   .checklist-group label {
     display: flex;
     align-items: flex-start;
     gap: 7px;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     line-height: 1.35;
     color: var(--muted);
     padding: 3px 0;
@@ -471,23 +472,24 @@
     border-left: 3px solid var(--note-line);
   }
   .note-label {
+    font-size: 0.875rem;
     font-weight: 700;
     color: var(--ink);
     margin-bottom: 3px;
   }
   .note-text {
     color: var(--muted);
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     line-height: 1.4;
   }
-  .note-text a, .energy-intro a, .itin-stats a, .gear-intro a {
+  .note-text a, .itin-intro a, .energy-intro a, .itin-stats a, .gear-intro a {
     color: var(--accent-dark);
     font-weight: 600;
     text-decoration: underline;
     text-decoration-color: var(--line);
     text-underline-offset: 2px;
   }
-  .note-text a:hover, .energy-intro a:hover, .itin-stats a:hover, .gear-intro a:hover {
+  .note-text a:hover, .itin-intro a:hover, .energy-intro a:hover, .itin-stats a:hover, .gear-intro a:hover {
     text-decoration-color: currentColor;
   }
   /* In-page jump target (from the Down card): leave some room above it and
@@ -509,7 +511,7 @@
     flex-shrink: 0;
   }
   #itin-panel h2 {
-    margin: 0 0 10px;
+    margin: 0;
     font-size: 0.95rem;
     font-weight: 700;
     color: var(--accent-dark);
@@ -540,15 +542,15 @@
     background: var(--paper);
     border-left: 3px solid var(--line);
   }
-  .itin-day .itin-label { font-weight: 700; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .itin-day .itin-label { font-size: 0.875rem; font-weight: 700; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
   .itin-day .itin-temp { font-weight: 600; color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
-  .itin-day .itin-stats { color: var(--muted); font-size: 0.8rem; }
+  .itin-day .itin-stats { color: var(--muted); font-size: 0.75rem; }
   .itin-up { background: var(--up-bg); border-left-color: var(--up-line); }
   .itin-down { background: var(--down-bg); border-left-color: var(--down-line); }
   .totals-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: var(--muted);
     margin: 2px 0 6px;
   }
@@ -585,9 +587,8 @@
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
     gap: 10px;
-    margin-bottom: 10px;
   }
-  #itin-panel .itin-header h2 { margin: 0; text-align: center; }
+  #itin-panel .itin-header h2 { text-align: center; }
   .itin-header .theme-switch { justify-self: end; }
   .home-btn {
     justify-self: start;
@@ -636,24 +637,20 @@
 
   @media (max-width: 680px) {
     #app { padding: 8px; gap: 8px; }
-    #energy-card { padding: 10px 12px; }
-    .energy-intro { font-size: 0.7rem; }
+    #itin-card, #energy-card { padding: 10px 12px; }
     #energy-body { gap: 7px; }
     #energy-body .itin-day { flex-basis: 100%; padding: 6px 8px; }
     #gear-card { padding: 10px 12px; }
-    .gear-intro { font-size: 0.8rem; }
     .checklist-grid { gap: 7px; }
     .checklist-group { flex-basis: 100%; padding: 6px 8px; }
     #trail-notes { padding: 10px 12px; }
     .notes-grid { gap: 7px; }
     .note-item { flex-basis: 100%; padding: 6px 8px; }
-    .note-text { font-size: 0.76rem; }
     #profile-wrap { height: 370px; }
-    #itin-panel { padding: 10px 12px; font-size: 0.82rem; }
+    #itin-panel { padding: 10px 12px; }
     .map-header, #profile-header { padding: 10px 12px 6px; }
     #itin-body { gap: 7px; }
     .itin-day { flex-basis: 100%; padding: 6px 8px; }
-    .itin-day .itin-stats { font-size: 0.78rem; }
     #profile-footer { font-size: 0.66rem; }
     /* Five columns don't fit a phone: stack each plan as its name on one
        line and its four labeled values in a row beneath it. */
@@ -718,6 +715,10 @@
         <button type="button" data-theme-choice="dark" title="Dark" aria-label="Dark theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></button>
       </div>
     </div>
+  </div>
+  <div id="itin-card">
+    <h2>Itinerary</h2>
+    <div class="itin-intro" id="itin-intro"></div>
     <div id="itin-body"></div>
   </div>
   <div id="content-row">
@@ -1275,6 +1276,7 @@ function totalsRows() {
 
 function renderSummary() {
   const ft = m => `${Math.round(m * 3.28084).toLocaleString()} ft`;
+  document.getElementById('itin-intro').innerHTML = `La Luz climbs the steep west face of the Sandia Mountains from the high-desert foothills on Albuquerque's northeast edge, switchbacking up through pi&ntilde;on-juniper, ponderosa pine, and mixed conifer to the tram's upper terminal near the crest &mdash; ${fmtMiles(upMi)} miles and ${upGainFt} feet of climbing one way. Times assume starting at ${fmtHourNatural(START_HOUR)} and a ${PACE_MPH}&nbsp;mph baseline pace plus <a href="https://en.wikipedia.org/wiki/Naismith%27s_rule" target="_blank" rel="noopener">Naismith's rule</a> (+1 hr per 2,000&nbsp;ft of climbing), which lands close to AllTrails' 8.5&ndash;9 hr round-trip estimate, with each leg's share of that time split using a <a href="https://arxiv.org/abs/2303.16065" target="_blank" rel="noopener">walking-speed model fit to ~88,000&nbsp;km of real GPS hiking tracks</a>. The plan is to ride the tram down, with hiking back down as the fallback.`;
   itinBody.innerHTML = `
     <div class="itin-day itin-opt">
       <div class="itin-label">Optional</div>
