@@ -1466,15 +1466,14 @@ function rebuildWeatherModel() {
   maxUv = Math.max(6, Math.ceil(Math.max(...uvAtPoint)));
 }
 
-// Badges on the Up/Down cards: the full-day range at the trailhead and at
-// the high point (not just the narrower range you'll pass through while
-// moving — that's what the temperature graph shows).
+// Badges on the Up/Down cards: the range you'll actually hike through on
+// each leg, from the same per-point temperatures the graph plots.
 function updateTempBadges() {
   const up = document.getElementById('temp-badge-up');
   const down = document.getElementById('temp-badge-down');
-  const r = ([lo, hi]) => `${Math.round(lo)}–${Math.round(hi)}°F`;
-  if (up) up.textContent = `Top ${r(dayRanges.hp)}`;
-  if (down) down.textContent = `Trailhead ${r(dayRanges.th)}`;
+  const r = temps => `${Math.round(Math.min(...temps))}–${Math.round(Math.max(...temps))}°F`;
+  if (up) up.textContent = r(tempAtPoint.slice(0, turnIdx + 1));
+  if (down) down.textContent = r(tempAtPoint.slice(turnIdx));
 }
 
 rebuildWeatherModel();
